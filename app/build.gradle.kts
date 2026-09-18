@@ -41,6 +41,10 @@ dependencies {
   implementation("androidx.room:room-runtime:2.8.4")
   implementation("androidx.room:room-ktx:2.8.4")
   ksp("androidx.room:room-compiler:2.8.4")
+
+  // Bundled Latin-script OCR model: available immediately and works offline.
+  implementation("com.google.mlkit:text-recognition:16.0.1")
+
   implementation(platform("androidx.compose:compose-bom:2026.02.01"))
   implementation("androidx.compose.ui:ui")
   implementation("androidx.compose.ui:ui-tooling-preview")
