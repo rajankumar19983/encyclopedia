@@ -48,6 +48,9 @@ interface EncyclopaediaDao {
   @Query("SELECT * FROM questions")
   suspend fun getAllQuestionsOnce(): List<QuestionEntity>
 
+  @Query("SELECT * FROM questions ORDER BY RANDOM() LIMIT :limit")
+  suspend fun getRandomQuestions(limit: Int): List<QuestionEntity>
+
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   suspend fun upsertQuestion(question: QuestionEntity)
 
@@ -60,6 +63,21 @@ interface EncyclopaediaDao {
   @Query("DELETE FROM question_topics WHERE questionId = :questionId")
   suspend fun clearQuestionTopics(questionId: String)
 
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  suspend fun insertAttempt(attempt: QuestionAttemptEntity)
+
+  @Query("SELECT * FROM question_attempts WHERE questionId = :questionId ORDER BY attemptedAt DESC")
+  fun observeAttemptsForQuestion(questionId: String): Flow<List<QuestionAttemptEntity>>
+
+  @Query("SELECT COUNT(*) FROM question_attempts")
+  fun observeAttemptCount(): Flow<Int>
+
+  @Query("SELECT COUNT(*) FROM question_attempts WHERE isCorrect = 1")
+  fun observeCorrectAttemptCount(): Flow<Int>
+
+  @Query("SELECT * FROM question_attempts ORDER BY attemptedAt DESC")
+  fun observeAllAttempts(): Flow<List<QuestionAttemptEntity>>
+
   @Transaction
   suspend fun saveQuestion(question: QuestionEntity, topicId: String?) {
     upsertQuestion(question)
@@ -67,27 +85,14 @@ interface EncyclopaediaDao {
     if (topicId != null) upsertQuestionTopic(QuestionTopicEntity(question.id, topicId))
   }
 
-  /**
-   * Import-only save guard. OCR/PDF imports should never silently create another copy
-   * of a question that is already in the local bank. Comparison deliberately ignores
-   * punctuation, whitespace and case because OCR often varies those details.
-   *
-   * Returns true only when a new question was actually stored.
-   */
   @Transaction
   suspend fun saveImportedQuestionIfUnique(question: QuestionEntity, topicId: String?): Boolean {
     val incomingQuestion = importFingerprint(question.questionText)
-    val incomingOptions = question.options.lines()
-      .map(::importFingerprint)
-      .filter { it.isNotBlank() }
-
+    val incomingOptions = question.options.lines().map(::importFingerprint).filter { it.isNotBlank() }
     val duplicate = getAllQuestionsOnce().any { existing ->
       importFingerprint(existing.questionText) == incomingQuestion &&
-        existing.options.lines()
-          .map(::importFingerprint)
-          .filter { it.isNotBlank() } == incomingOptions
+        existing.options.lines().map(::importFingerprint).filter { it.isNotBlank() } == incomingOptions
     }
-
     if (duplicate) return false
     saveQuestion(question, topicId)
     return true
