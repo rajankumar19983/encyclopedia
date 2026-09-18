@@ -12,6 +12,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,9 +30,14 @@ fun PerformanceScreen() {
   val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
   val questions by dao.observeQuestions().collectAsStateWithLifecycle(emptyList())
   val attempts by dao.observeAllAttempts().collectAsStateWithLifecycle(emptyList())
-  var period by remember { mutableStateOf(PerformancePeriod.ALL) }
-  val filteredAttempts = remember(attempts, period) { attempts.withinPeriod(period) }
+  var dashboardState by remember { mutableStateOf(PerformanceDashboardState()) }
+  val filteredAttempts = remember(attempts, dashboardState.period) {
+    attempts.withinPeriod(dashboardState.period)
+  }
   val data = remember(questions, filteredAttempts) { buildPerformanceData(questions, filteredAttempts) }
+  val visibleWeakQuestions = remember(data, dashboardState.weakQuestionQuery, dashboardState.weakQuestionSort) {
+    data.visibleWeakQuestions(dashboardState)
+  }
   val summary = data.summary
 
   LazyColumn(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -40,8 +46,8 @@ fun PerformanceScreen() {
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         PerformancePeriod.entries.forEach { option ->
           FilterChip(
-            selected = period == option,
-            onClick = { period = option },
+            selected = dashboardState.period == option,
+            onClick = { dashboardState = dashboardState.copy(period = option) },
             label = { Text(option.label) }
           )
         }
@@ -74,8 +80,34 @@ fun PerformanceScreen() {
       item { Text("Recent trend", style = MaterialTheme.typography.titleLarge) }
       item { Text("${trendLabel(data.trend.change)} • recent ${data.trend.recent}% vs previous ${data.trend.previous}% (${signedPercent(data.trend.change)})") }
       item { Text("Weak questions", style = MaterialTheme.typography.titleLarge) }
-      if (data.weakQuestions.isEmpty()) item { Text("No incorrect answers recorded.") }
-      items(data.weakQuestions.take(20), key = { it.question.id }) { weak ->
+      if (data.weakQuestions.isNotEmpty()) {
+        item {
+          OutlinedTextField(
+            value = dashboardState.weakQuestionQuery,
+            onValueChange = { dashboardState = dashboardState.copy(weakQuestionQuery = it) },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Search weak questions") },
+            singleLine = true
+          )
+        }
+        item {
+          Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PerformanceSort.entries.forEach { sort ->
+              FilterChip(
+                selected = dashboardState.weakQuestionSort == sort,
+                onClick = { dashboardState = dashboardState.copy(weakQuestionSort = sort) },
+                label = { Text(sort.label()) }
+              )
+            }
+          }
+        }
+      }
+      if (data.weakQuestions.isEmpty()) {
+        item { Text("No incorrect answers recorded.") }
+      } else if (visibleWeakQuestions.isEmpty()) {
+        item { Text("No weak questions match your search.") }
+      }
+      items(visibleWeakQuestions.take(20), key = { it.question.id }) { weak ->
         Card(Modifier.fillMaxWidth()) {
           Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(weak.question.questionText, style = MaterialTheme.typography.titleMedium)
@@ -87,4 +119,10 @@ fun PerformanceScreen() {
     item { Text("Recommendation", style = MaterialTheme.typography.titleLarge) }
     item { Text(data.recommendation()) }
   }
+}
+
+private fun PerformanceSort.label(): String = when (this) {
+  PerformanceSort.MOST_MISTAKES -> "Most mistakes"
+  PerformanceSort.LOWEST_ACCURACY -> "Lowest accuracy"
+  PerformanceSort.MOST_ATTEMPTED -> "Most attempted"
 }
