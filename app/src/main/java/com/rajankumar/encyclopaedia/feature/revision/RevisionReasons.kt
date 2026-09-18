@@ -2,30 +2,25 @@ package com.rajankumar.encyclopaedia.feature.revision
 
 import com.rajankumar.encyclopaedia.data.local.QuestionAttemptEntity
 
+private const val SLOW_ANSWER_THRESHOLD_MS = 60_000L
+private const val LOW_ACCURACY_PERCENT = 60
+
 fun List<QuestionAttemptEntity>.revisionReasons(): Set<RevisionReason> {
   if (isEmpty()) return emptySet()
 
   val attemptCount = size
-  var mistakes = 0
-  var correct = 0
-  var hasSlowAnswer = false
-
-  for (attempt in this) {
-    if (attempt.isCorrect) {
-      correct++
-    } else {
-      mistakes++
-    }
-
-    if (attempt.timeTakenMs >= 60_000) {
-      hasSlowAnswer = true
-    }
+  val mistakeCount = count { attempt -> !attempt.isCorrect }
+  val correctCount = attemptCount - mistakeCount
+  val hasSlowAnswer = any { attempt ->
+    attempt.timeTakenMs >= SLOW_ANSWER_THRESHOLD_MS
   }
 
   return buildSet {
-    if (mistakes > 0) add(RevisionReason.INCORRECT)
-    if (mistakes >= 2) add(RevisionReason.REPEATED_MISTAKE)
+    if (mistakeCount > 0) add(RevisionReason.INCORRECT)
+    if (mistakeCount >= 2) add(RevisionReason.REPEATED_MISTAKE)
     if (hasSlowAnswer) add(RevisionReason.SLOW_ANSWER)
-    if (correct * 100 / attemptCount < 60) add(RevisionReason.LOW_ACCURACY)
+    if (correctCount * 100 / attemptCount < LOW_ACCURACY_PERCENT) {
+      add(RevisionReason.LOW_ACCURACY)
+    }
   }
 }
