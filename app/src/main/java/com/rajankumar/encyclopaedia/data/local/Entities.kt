@@ -59,3 +59,25 @@ data class QuestionTopicEntity(
   val questionId: String,
   val knowledgeNodeId: String
 )
+
+@Entity(
+  tableName = "question_attempts",
+  foreignKeys = [
+    ForeignKey(
+      entity = QuestionEntity::class,
+      parentColumns = ["id"],
+      childColumns = ["questionId"],
+      onDelete = ForeignKey.CASCADE
+    )
+  ],
+  indices = [Index("questionId"), Index("attemptedAt"), Index("sessionId")]
+)
+data class QuestionAttemptEntity(
+  @PrimaryKey val id: String,
+  val questionId: String,
+  val sessionId: String,
+  val selectedAnswer: String,
+  val isCorrect: Boolean,
+  val timeTakenMs: Long,
+  val attemptedAt: Long = System.currentTimeMillis()
+)
