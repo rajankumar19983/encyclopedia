@@ -41,6 +41,9 @@ fun HomeScreen() {
   val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
   val topicCount by dao.observeTopicCount().collectAsStateWithLifecycle(0)
   val questionCount by dao.observeQuestionCount().collectAsStateWithLifecycle(0)
+  val attemptCount by dao.observeAttemptCount().collectAsStateWithLifecycle(0)
+  val correctCount by dao.observeCorrectAttemptCount().collectAsStateWithLifecycle(0)
+  val accuracy = if (attemptCount > 0) ((correctCount * 100f) / attemptCount).toInt().coerceIn(0, 100) else 0
 
   Column(
     modifier = Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 24.dp),
@@ -59,12 +62,12 @@ fun HomeScreen() {
     ) {
       items(listOf(
         Stat("Topics", topicCount.toString(), if (topicCount == 0) "Build your knowledge tree" else "Stored in your knowledge tree", Icons.Default.AutoStories, if (topicCount > 0) 1f else 0f),
-        Stat("Questions", questionCount.toString(), if (questionCount == 0) "Your question bank is ready" else "Stored locally on this device", Icons.Default.Quiz, if (questionCount > 0) 1f else 0f),
-        Stat("Day Streak", "0", "Practice tracking comes next", Icons.Default.LocalFireDepartment, 0f),
-        Stat("Overall Progress", "0%", "Practice to build progress", Icons.Default.CheckCircle, 0f)
+        Stat("Questions", questionCount.toString(), if (attemptCount == 0) "Start practising your question bank" else "$attemptCount answers attempted", Icons.Default.Quiz, if (questionCount > 0) 1f else 0f),
+        Stat("Practice", attemptCount.toString(), if (attemptCount == 0) "No attempts recorded yet" else "$correctCount correct answers", Icons.Default.LocalFireDepartment, (attemptCount / 20f).coerceIn(0f, 1f)),
+        Stat("Accuracy", "$accuracy%", if (attemptCount == 0) "Practice to build your baseline" else "$correctCount of $attemptCount correct", Icons.Default.CheckCircle, accuracy / 100f)
       )) { StatCard(it) }
 
-      item(span = { GridItemSpan(maxLineSpan) }) { TodayPlanCard() }
+      item(span = { GridItemSpan(maxLineSpan) }) { TodayPlanCard(attemptCount) }
       item(span = { GridItemSpan(maxLineSpan) }) { QuickActionsCard() }
     }
   }
@@ -86,15 +89,15 @@ private fun StatCard(stat: Stat) {
 }
 
 @Composable
-private fun TodayPlanCard() {
+private fun TodayPlanCard(attemptCount: Int) {
   Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
     Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
       Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.Bolt, null, tint = MaterialTheme.colorScheme.primary)
         Text("Today's Plan", style = MaterialTheme.typography.titleLarge)
       }
-      Text("Your daily learning, revision and practice tasks will appear here.")
-      Text("Complete the plan first, then explore anything you want.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+      Text(if (attemptCount == 0) "Begin with a practice session from your Question Bank." else "Keep building your knowledge with learning, revision and practice.")
+      Text("Your full adaptive daily routine will use your performance history.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
   }
 }
