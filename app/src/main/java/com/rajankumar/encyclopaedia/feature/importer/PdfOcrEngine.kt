@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
-import android.os.ParcelFileDescriptor
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -13,8 +12,9 @@ import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
- * Renders PDF pages in memory and runs the same bundled ML Kit OCR used for images.
- * Rendered bitmaps are recycled immediately and are never persisted to storage.
+ * Processes every page in the selected PDF. There is deliberately no file-size or
+ * page-count limit. Only one rendered page is kept in memory at a time, then recycled.
+ * This makes very large PDFs practical without retaining source-page images.
  */
 class PdfOcrEngine {
   suspend fun recognize(
@@ -28,24 +28,27 @@ class PdfOcrEngine {
     descriptor.use { file ->
       PdfRenderer(file).use { renderer ->
         require(renderer.pageCount > 0) { "PDF has no pages" }
-        val pages = ArrayList<String>(renderer.pageCount)
+        val output = StringBuilder()
+
         for (index in 0 until renderer.pageCount) {
           onProgress(index + 1, renderer.pageCount)
           renderer.openPage(index).use { page ->
-            // 2x rendering substantially improves small printed MCQ OCR while keeping
-            // memory bounded because only one page bitmap exists at a time.
-            val width = (page.width * 2).coerceAtMost(3000)
-            val height = (page.height * 2).coerceAtMost(4200)
+            // No arbitrary pixel-dimension cap. Render at 2x native PDF page size
+            // for better recognition of small printed text.
+            val width = Math.multiplyExact(page.width, 2)
+            val height = Math.multiplyExact(page.height, 2)
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             try {
               page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-              pages += recognizeBitmap(bitmap)
+              if (output.isNotEmpty()) output.append('\n')
+              output.append(recognizeBitmap(bitmap))
             } finally {
               bitmap.recycle()
             }
           }
         }
-        return pages.joinToString("\n")
+
+        return output.toString()
       }
     }
   }
