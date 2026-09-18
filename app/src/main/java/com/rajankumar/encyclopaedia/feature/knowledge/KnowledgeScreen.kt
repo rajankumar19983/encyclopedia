@@ -1,5 +1,6 @@
 package com.rajankumar.encyclopaedia.feature.knowledge
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,10 +11,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -30,42 +33,54 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rajankumar.encyclopaedia.data.local.EncyclopaediaDatabase
 import com.rajankumar.encyclopaedia.data.local.KnowledgeNodeEntity
+import com.rajankumar.encyclopaedia.data.local.LessonEntity
 import java.util.UUID
 import kotlinx.coroutines.launch
 
 @Composable
 fun KnowledgeScreen() {
   val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
-  val nodes by dao.observeRootNodes().collectAsStateWithLifecycle(emptyList())
+  val roots by dao.observeRootNodes().collectAsStateWithLifecycle(emptyList())
   val scope = rememberCoroutineScope()
-  var showAdd by remember { mutableStateOf(false) }
+  var selected by remember { mutableStateOf<KnowledgeNodeEntity?>(null) }
+  var addNode by remember { mutableStateOf(false) }
+  var addLesson by remember { mutableStateOf(false) }
 
-  Column(
-    Modifier.fillMaxSize().padding(28.dp),
-    verticalArrangement = Arrangement.spacedBy(16.dp)
-  ) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-      Column {
-        Text("Knowledge & Lessons", style = MaterialTheme.typography.headlineMedium)
-        Text("Build your editable knowledge tree.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-      }
-      Button(onClick = { showAdd = true }) {
-        Icon(Icons.Default.Add, null)
-        Text(" Add Topic")
+  if (selected == null) {
+    Column(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+      Header("Knowledge & Lessons", "Build subjects, topics, subtopics and permanent lessons.") { addNode = true }
+      if (roots.isEmpty()) Text("No subjects yet. Add your first subject to begin.")
+      LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        items(roots, key = { it.id }) { node -> NodeCard(node) { selected = node }
       }
     }
-
-    if (nodes.isEmpty()) {
-      Text("No topics yet. Add your first subject or topic to begin.")
-    } else {
+  } else {
+    val node = selected!!
+    val children by dao.observeChildren(node.id).collectAsStateWithLifecycle(emptyList())
+    val lessons by dao.observeLessons(node.id).collectAsStateWithLifecycle(emptyList())
+    Column(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Row {
+          IconButton(onClick = { selected = null }) { Icon(Icons.Default.ArrowBack, "Back") }
+          Column {
+            Text(node.name, style = MaterialTheme.typography.headlineMedium)
+            Text("${children.size} subtopics • ${lessons.size} lessons", color = MaterialTheme.colorScheme.onSurfaceVariant)
+          }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          Button(onClick = { addNode = true }) { Text("Add Subtopic") }
+          Button(onClick = { addLesson = true }) { Text("Add Lesson") }
+        }
+      }
       LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        items(nodes, key = { it.id }) { node ->
+        if (children.isNotEmpty()) item { Text("Subtopics", style = MaterialTheme.typography.titleLarge) }
+        items(children, key = { it.id }) { child -> NodeCard(child) { selected = child } }
+        if (lessons.isNotEmpty()) item { Text("Lessons", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 10.dp)) }
+        items(lessons, key = { it.id }) { lesson ->
           Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(18.dp)) {
-              Text(node.name, style = MaterialTheme.typography.titleMedium)
-              node.description?.takeIf { it.isNotBlank() }?.let {
-                Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
-              }
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+              Text(lesson.title, style = MaterialTheme.typography.titleMedium)
+              Text(lesson.content, maxLines = 5, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
           }
         }
@@ -73,43 +88,42 @@ fun KnowledgeScreen() {
     }
   }
 
-  if (showAdd) {
-    AddTopicDialog(
-      onDismiss = { showAdd = false },
-      onSave = { name, description ->
-        scope.launch {
-          dao.upsertNode(
-            KnowledgeNodeEntity(
-              id = UUID.randomUUID().toString(),
-              parentId = null,
-              name = name.trim(),
-              description = description.trim().ifBlank { null },
-              sortOrder = nodes.size
-            )
-          )
-        }
-        showAdd = false
-      }
-    )
+  if (addNode) NodeDialog(if (selected == null) "Add subject" else "Add subtopic", { addNode = false }) { name, desc ->
+    scope.launch { dao.upsertNode(KnowledgeNodeEntity(UUID.randomUUID().toString(), selected?.id, name.trim(), desc.trim().ifBlank { null })) }
+    addNode = false
+  }
+  if (addLesson && selected != null) LessonDialog({ addLesson = false }) { title, content ->
+    scope.launch { dao.upsertLesson(LessonEntity(UUID.randomUUID().toString(), selected!!.id, title.trim(), content.trim())) }
+    addLesson = false
   }
 }
 
-@Composable
-private fun AddTopicDialog(onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
-  var name by remember { mutableStateOf("") }
-  var description by remember { mutableStateOf("") }
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    title = { Text("Add topic") },
-    text = {
-      Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
-        OutlinedTextField(description, { description = it }, label = { Text("Description") })
-      }
-    },
-    confirmButton = {
-      TextButton(onClick = { onSave(name, description) }, enabled = name.isNotBlank()) { Text("Save") }
-    },
-    dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
-  )
+@Composable private fun Header(title: String, subtitle: String, onAdd: () -> Unit) {
+  Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+    Column { Text(title, style = MaterialTheme.typography.headlineMedium); Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    Button(onClick = onAdd) { Icon(Icons.Default.Add, null); Text(" Add Subject") }
+  }
+}
+
+@Composable private fun NodeCard(node: KnowledgeNodeEntity, onClick: () -> Unit) {
+  Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+    Column(Modifier.padding(18.dp)) {
+      Text(node.name, style = MaterialTheme.typography.titleMedium)
+      node.description?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+  }
+}
+
+@Composable private fun NodeDialog(title: String, dismiss: () -> Unit, save: (String, String) -> Unit) {
+  var name by remember { mutableStateOf("") }; var desc by remember { mutableStateOf("") }
+  AlertDialog(onDismissRequest = dismiss, title = { Text(title) }, text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    OutlinedTextField(name, { name = it }, label = { Text("Name") }); OutlinedTextField(desc, { desc = it }, label = { Text("Description") })
+  } }, confirmButton = { TextButton(onClick = { save(name, desc) }, enabled = name.isNotBlank()) { Text("Save") } }, dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } })
+}
+
+@Composable private fun LessonDialog(dismiss: () -> Unit, save: (String, String) -> Unit) {
+  var title by remember { mutableStateOf("") }; var content by remember { mutableStateOf("") }
+  AlertDialog(onDismissRequest = dismiss, title = { Text("Add permanent lesson") }, text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    OutlinedTextField(title, { title = it }, label = { Text("Lesson title") }); OutlinedTextField(content, { content = it }, label = { Text("Lesson content") }, minLines = 6)
+  } }, confirmButton = { TextButton(onClick = { save(title, content) }, enabled = title.isNotBlank() && content.isNotBlank()) { Text("Save") } }, dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } })
 }
