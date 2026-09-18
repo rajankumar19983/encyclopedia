@@ -6,7 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-  entities = [KnowledgeNodeEntity::class, LessonEntity::class, QuestionEntity::class],
+  entities = [KnowledgeNodeEntity::class, LessonEntity::class, QuestionEntity::class, QuestionTopicEntity::class],
   version = 1,
   exportSchema = false
 )
@@ -21,7 +21,7 @@ abstract class EncyclopaediaDatabase : RoomDatabase() {
         context.applicationContext,
         EncyclopaediaDatabase::class.java,
         "encyclopaedia.db"
-      ).build().also { instance = it }
+      ).fallbackToDestructiveMigration(false).build().also { instance = it }
     }
   }
 }
