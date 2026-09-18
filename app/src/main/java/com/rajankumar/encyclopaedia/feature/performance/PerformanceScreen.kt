@@ -15,7 +15,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -27,11 +29,24 @@ fun PerformanceScreen() {
   val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
   val questions by dao.observeQuestions().collectAsStateWithLifecycle(emptyList())
   val attempts by dao.observeAllAttempts().collectAsStateWithLifecycle(emptyList())
-  val data = remember(questions, attempts) { buildPerformanceData(questions, attempts) }
+  var period by remember { mutableStateOf(PerformancePeriod.ALL) }
+  val filteredAttempts = remember(attempts, period) { attempts.withinPeriod(period) }
+  val data = remember(questions, filteredAttempts) { buildPerformanceData(questions, filteredAttempts) }
   val summary = data.summary
 
   LazyColumn(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
     item { Text("Performance", style = MaterialTheme.typography.headlineMedium) }
+    item {
+      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        PerformancePeriod.entries.forEach { option ->
+          FilterChip(
+            selected = period == option,
+            onClick = { period = option },
+            label = { Text(option.label) }
+          )
+        }
+      }
+    }
     item { Text(data.narrative(), color = MaterialTheme.colorScheme.onSurfaceVariant) }
     item {
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -55,7 +70,7 @@ fun PerformanceScreen() {
         }
       }
     }
-    if (attempts.isNotEmpty()) {
+    if (filteredAttempts.isNotEmpty()) {
       item { Text("Recent trend", style = MaterialTheme.typography.titleLarge) }
       item { Text("${trendLabel(data.trend.change)} • recent ${data.trend.recent}% vs previous ${data.trend.previous}% (${signedPercent(data.trend.change)})") }
       item { Text("Weak questions", style = MaterialTheme.typography.titleLarge) }
