@@ -78,6 +78,36 @@ interface EncyclopaediaDao {
   @Query("SELECT * FROM question_attempts ORDER BY attemptedAt DESC")
   fun observeAllAttempts(): Flow<List<QuestionAttemptEntity>>
 
+  @Query("SELECT * FROM question_attempts ORDER BY attemptedAt DESC")
+  suspend fun getAllAttemptsOnce(): List<QuestionAttemptEntity>
+
+  @Query("SELECT * FROM question_attempts WHERE sessionId = :sessionId ORDER BY attemptedAt")
+  suspend fun getSessionAttempts(sessionId: String): List<QuestionAttemptEntity>
+
+  @Query("SELECT COUNT(DISTINCT questionId) FROM question_attempts")
+  fun observePractisedQuestionCount(): Flow<Int>
+
+  @Query("SELECT COUNT(*) FROM question_attempts WHERE attemptedAt >= :since")
+  fun observeAttemptsSince(since: Long): Flow<Int>
+
+  @Query("SELECT COUNT(*) FROM question_attempts WHERE attemptedAt >= :since AND isCorrect = 1")
+  fun observeCorrectAttemptsSince(since: Long): Flow<Int>
+
+  @Query("SELECT AVG(timeTakenMs) FROM question_attempts")
+  fun observeAverageTimeMs(): Flow<Double?>
+
+  @Query("SELECT * FROM questions WHERE id IN (SELECT DISTINCT questionId FROM question_attempts WHERE isCorrect = 0) ORDER BY RANDOM() LIMIT :limit")
+  suspend fun getPreviouslyIncorrectQuestions(limit: Int): List<QuestionEntity>
+
+  @Query("SELECT * FROM questions WHERE id NOT IN (SELECT DISTINCT questionId FROM question_attempts) ORDER BY RANDOM() LIMIT :limit")
+  suspend fun getUnattemptedQuestions(limit: Int): List<QuestionEntity>
+
+  @Query("SELECT COUNT(*) FROM question_attempts WHERE questionId = :questionId")
+  suspend fun getAttemptCountForQuestion(questionId: String): Int
+
+  @Query("SELECT COUNT(*) FROM question_attempts WHERE questionId = :questionId AND isCorrect = 1")
+  suspend fun getCorrectCountForQuestion(questionId: String): Int
+
   @Transaction
   suspend fun saveQuestion(question: QuestionEntity, topicId: String?) {
     upsertQuestion(question)
