@@ -45,6 +45,9 @@ interface EncyclopaediaDao {
   @Query("SELECT COUNT(*) FROM questions")
   fun observeQuestionCount(): Flow<Int>
 
+  @Query("SELECT * FROM questions")
+  suspend fun getAllQuestionsOnce(): List<QuestionEntity>
+
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   suspend fun upsertQuestion(question: QuestionEntity)
 
@@ -63,4 +66,34 @@ interface EncyclopaediaDao {
     clearQuestionTopics(question.id)
     if (topicId != null) upsertQuestionTopic(QuestionTopicEntity(question.id, topicId))
   }
+
+  /**
+   * Import-only save guard. OCR/PDF imports should never silently create another copy
+   * of a question that is already in the local bank. Comparison deliberately ignores
+   * punctuation, whitespace and case because OCR often varies those details.
+   *
+   * Returns true only when a new question was actually stored.
+   */
+  @Transaction
+  suspend fun saveImportedQuestionIfUnique(question: QuestionEntity, topicId: String?): Boolean {
+    val incomingQuestion = importFingerprint(question.questionText)
+    val incomingOptions = question.options.lines()
+      .map(::importFingerprint)
+      .filter { it.isNotBlank() }
+
+    val duplicate = getAllQuestionsOnce().any { existing ->
+      importFingerprint(existing.questionText) == incomingQuestion &&
+        existing.options.lines()
+          .map(::importFingerprint)
+          .filter { it.isNotBlank() } == incomingOptions
+    }
+
+    if (duplicate) return false
+    saveQuestion(question, topicId)
+    return true
+  }
 }
+
+private fun importFingerprint(value: String): String = value
+  .lowercase()
+  .replace(Regex("[^\\p{L}\\p{N}]+"), "")
