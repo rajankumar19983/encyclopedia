@@ -35,11 +35,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rajankumar.encyclopaedia.data.local.EncyclopaediaDatabase
 import com.rajankumar.encyclopaedia.data.local.KnowledgeNodeEntity
 import com.rajankumar.encyclopaedia.data.local.QuestionEntity
+import com.rajankumar.encyclopaedia.feature.importer.QuestionImportScreen
 import java.util.UUID
 import kotlinx.coroutines.launch
 
 @Composable
 fun QuestionBankScreen() {
+  var importing by remember { mutableStateOf(false) }
+  if (importing) {
+    QuestionImportScreen(onDone = { importing = false })
+    return
+  }
+
   val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
   val questions by dao.observeQuestions().collectAsStateWithLifecycle(emptyList())
   val topics by dao.observeAllNodes().collectAsStateWithLifecycle(emptyList())
@@ -53,13 +60,16 @@ fun QuestionBankScreen() {
         Text("Question Bank", style = MaterialTheme.typography.headlineMedium)
         Text("${questions.size} questions stored locally", color = MaterialTheme.colorScheme.onSurfaceVariant)
       }
-      Button(onClick = { editing = null; showEditor = true }) {
-        Icon(Icons.Default.Add, null)
-        Text(" Add Question")
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = { importing = true }) { Text("Scan Image") }
+        Button(onClick = { editing = null; showEditor = true }) {
+          Icon(Icons.Default.Add, null)
+          Text(" Add Question")
+        }
       }
     }
 
-    if (questions.isEmpty()) Text("No questions yet. Add one manually; scanner and PDF import will feed this same bank.")
+    if (questions.isEmpty()) Text("No questions yet. Add one manually or scan a printed MCQ image.")
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
       items(questions, key = { it.id }) { question ->
         Card(Modifier.fillMaxWidth()) {
@@ -104,16 +114,17 @@ private fun QuestionEditorDialog(
   onDismiss: () -> Unit,
   onSave: (QuestionEntity, String?) -> Unit
 ) {
-  var questionText by remember(existing?.id) { mutableStateOf(existing?.questionText.orEmpty()) }
-  val initialOptions = existing?.options?.lines()?.filter { it.isNotBlank() }.orEmpty().let {
-    if (it.size >= 2) it else listOf("", "", "", "")
+  var questionText by remember(existing) { mutableStateOf(existing?.questionText.orEmpty()) }
+  val initialOptions = existing?.options?.lines()?.filter { it.isNotBlank() }.orEmpty().ifEmpty { listOf("", "", "", "") }
+  val options = remember(existing) { mutableStateListOf<String>().apply { addAll(initialOptions.take(6)) } }
+  var correctIndex by remember(existing) {
+    mutableStateOf((existing?.correctAnswer?.firstOrNull()?.uppercaseChar()?.code?.minus('A'.code) ?: 0).coerceIn(0, options.lastIndex))
   }
-  val options = remember(existing?.id) { mutableStateListOf<String>().apply { addAll(initialOptions.take(6)) } }
-  var answerIndex by remember(existing?.id) {
-    mutableStateOf(('A'..'F').indexOf(existing?.correctAnswer?.trim()?.uppercase()?.firstOrNull()).coerceAtLeast(0))
-  }
-  var explanation by remember(existing?.id) { mutableStateOf(existing?.explanation.orEmpty()) }
-  var selectedTopicId by remember(existing?.id) { mutableStateOf<String?>(null) }
+  var explanation by remember(existing) { mutableStateOf(existing?.explanation.orEmpty()) }
+  var difficulty by remember(existing) { mutableStateOf(existing?.difficulty ?: "MEDIUM") }
+  var selectedTopic by remember { mutableStateOf<String?>(null) }
+
+  val valid = questionText.isNotBlank() && options.size in 2..6 && options.all { it.isNotBlank() } && correctIndex in options.indices
 
   AlertDialog(
     onDismissRequest = onDismiss,
@@ -122,46 +133,43 @@ private fun QuestionEditorDialog(
       LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item { OutlinedTextField(questionText, { questionText = it }, label = { Text("Question") }, modifier = Modifier.fillMaxWidth()) }
         items(options.size) { index ->
-          Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { answerIndex = index }) { Text(if (answerIndex == index) "✓ ${('A'.code + index).toChar()}" else "${('A'.code + index).toChar()}") }
+          Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            TextButton(onClick = { correctIndex = index }) { Text(if (correctIndex == index) "✓ ${('A'.code + index).toChar()}" else "${('A'.code + index).toChar()}") }
             OutlinedTextField(options[index], { options[index] = it }, label = { Text("Option ${index + 1}") }, modifier = Modifier.weight(1f))
-            if (options.size > 2) TextButton(onClick = { options.removeAt(index); if (answerIndex >= options.size) answerIndex = 0 }) { Text("−") }
+            if (options.size > 2) TextButton(onClick = { options.removeAt(index); correctIndex = correctIndex.coerceAtMost(options.lastIndex) }) { Text("−") }
           }
         }
-        if (options.size < 6) item { TextButton(onClick = { options.add("") }) { Text("+ Add option (${options.size}/6)") } }
+        if (options.size < 6) item { TextButton(onClick = { options.add("") }) { Text("+ Add option") } }
         item { OutlinedTextField(explanation, { explanation = it }, label = { Text("Explanation (optional)") }, modifier = Modifier.fillMaxWidth()) }
+        item { OutlinedTextField(difficulty, { difficulty = it.uppercase() }, label = { Text("Difficulty") }) }
         if (topics.isNotEmpty()) {
           item { Text("Topic (optional)", style = MaterialTheme.typography.titleSmall) }
-          items(topics.take(12), key = { it.id }) { topic ->
-            TextButton(onClick = { selectedTopicId = if (selectedTopicId == topic.id) null else topic.id }) {
-              Text(if (selectedTopicId == topic.id) "✓ ${topic.name}" else topic.name)
+          items(topics.take(20)) { topic ->
+            TextButton(onClick = { selectedTopic = if (selectedTopic == topic.id) null else topic.id }) {
+              Text(if (selectedTopic == topic.id) "✓ ${topic.name}" else topic.name)
             }
           }
         }
       }
     },
     confirmButton = {
-      val validOptions = options.map { it.trim() }.filter { it.isNotBlank() }
-      TextButton(
-        enabled = questionText.isNotBlank() && validOptions.size >= 2 && answerIndex < validOptions.size,
-        onClick = {
-          val now = System.currentTimeMillis()
-          onSave(
-            QuestionEntity(
-              id = existing?.id ?: UUID.randomUUID().toString(),
-              questionText = questionText.trim(),
-              options = validOptions.joinToString("\n"),
-              correctAnswer = ('A'.code + answerIndex).toChar().toString(),
-              explanation = explanation.trim().ifBlank { null },
-              source = existing?.source ?: "USER",
-              difficulty = existing?.difficulty ?: "MEDIUM",
-              createdAt = existing?.createdAt ?: now,
-              updatedAt = now
-            ),
-            selectedTopicId
-          )
-        }
-      ) { Text("Save") }
+      TextButton(enabled = valid, onClick = {
+        val now = System.currentTimeMillis()
+        onSave(
+          QuestionEntity(
+            id = existing?.id ?: UUID.randomUUID().toString(),
+            questionText = questionText.trim(),
+            options = options.joinToString("\n") { it.trim() },
+            correctAnswer = ('A'.code + correctIndex).toChar().toString(),
+            explanation = explanation.trim().ifBlank { null },
+            source = existing?.source ?: "USER",
+            difficulty = difficulty.trim().ifBlank { "MEDIUM" },
+            createdAt = existing?.createdAt ?: now,
+            updatedAt = now
+          ),
+          selectedTopic
+        )
+      }) { Text("Save") }
     },
     dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
   )
