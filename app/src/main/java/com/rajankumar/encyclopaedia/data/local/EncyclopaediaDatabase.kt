@@ -6,8 +6,14 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-  entities = [KnowledgeNodeEntity::class, LessonEntity::class, QuestionEntity::class, QuestionTopicEntity::class],
-  version = 1,
+  entities = [
+    KnowledgeNodeEntity::class,
+    LessonEntity::class,
+    QuestionEntity::class,
+    QuestionTopicEntity::class,
+    QuestionAttemptEntity::class
+  ],
+  version = 2,
   exportSchema = false
 )
 abstract class EncyclopaediaDatabase : RoomDatabase() {
