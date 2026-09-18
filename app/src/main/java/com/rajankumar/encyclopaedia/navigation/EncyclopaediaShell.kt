@@ -23,6 +23,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.rajankumar.encyclopaedia.feature.common.FeaturePlaceholderScreen
 import com.rajankumar.encyclopaedia.feature.home.HomeScreen
 import com.rajankumar.encyclopaedia.feature.knowledge.KnowledgeScreen
+import com.rajankumar.encyclopaedia.feature.questions.PracticeScreen
 import com.rajankumar.encyclopaedia.feature.questions.QuestionBankScreen
 
 @Composable
@@ -71,7 +72,9 @@ private fun EncyclopaediaNavHost(navController: NavHostController) {
     composable(AppDestination.Home.route) { HomeScreen() }
     composable(AppDestination.Learn.route) { KnowledgeScreen() }
     composable(AppDestination.Questions.route) { QuestionBankScreen() }
-    composable(AppDestination.Practice.route) { FeaturePlaceholderScreen("Practice", "Practice by topic, difficulty, source, mistakes, bookmarks or random selection.") }
+    composable(AppDestination.Practice.route) {
+      PracticeScreen(onDone = { navigateSingleTop(navController, AppDestination.Questions.route) })
+    }
     composable(AppDestination.Revision.route) { FeaturePlaceholderScreen("Revision", "Your mistakes, weak topics, bookmarks and scheduled revisions will collect here.") }
     composable(AppDestination.Planner.route) { FeaturePlaceholderScreen("Daily Planner", "Plan learning, revision, practice and PYQ work for each day.") }
     composable(AppDestination.Pyq.route) { FeaturePlaceholderScreen("PYQ Papers", "Organize official previous-year questions by exam, year, paper and shift.") }
