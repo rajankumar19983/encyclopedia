@@ -118,7 +118,7 @@ fun QuestionImportScreen(onDone: () -> Unit) {
         var question by remember(initial) { mutableStateOf(initial.questionText) }
         var optionsText by remember(initial) { mutableStateOf(initial.options.joinToString("\n")) }
         var answer by remember(initial) { mutableStateOf(initial.answer) }
-        var saved by remember(initial) { mutableStateOf(false) }
+        var saveState by remember(initial) { mutableStateOf("READY") }
         val options = optionsText.lines().map { it.trim() }.filter { it.isNotBlank() }.take(6)
         val validAnswer = answer.uppercase().singleOrNull()?.let {
           options.isNotEmpty() && it in 'A'..('A'.code + options.lastIndex).toChar()
@@ -140,10 +140,11 @@ fun QuestionImportScreen(onDone: () -> Unit) {
             OutlinedTextField(answer, { answer = it.take(1).uppercase() }, label = { Text("Correct option A–F") })
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
               Button(
-                enabled = valid && !saved,
+                enabled = valid && saveState == "READY",
                 onClick = {
+                  saveState = "SAVING"
                   scope.launch {
-                    dao.saveQuestion(
+                    val inserted = dao.saveImportedQuestionIfUnique(
                       QuestionEntity(
                         id = UUID.randomUUID().toString(),
                         questionText = question.trim(),
@@ -154,14 +155,28 @@ fun QuestionImportScreen(onDone: () -> Unit) {
                       ),
                       null
                     )
-                    saved = true
+                    saveState = if (inserted) "SAVED" else "DUPLICATE"
                   }
                 }
-              ) { Text(if (saved) "Saved" else "Approve & Save") }
+              ) {
+                Text(
+                  when (saveState) {
+                    "SAVING" -> "Checking…"
+                    "SAVED" -> "Saved"
+                    "DUPLICATE" -> "Already exists"
+                    else -> "Approve & Save"
+                  }
+                )
+              }
               TextButton(onClick = { drafts = drafts.filterIndexed { i, _ -> i != index } }) { Text("Reject") }
             }
-            if (!valid && !saved) {
-              Text(
+            when {
+              saveState == "DUPLICATE" -> Text(
+                "This question and its options already exist in the Question Bank, so another copy was not created.",
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodySmall
+              )
+              !valid && saveState != "SAVED" -> Text(
                 "Review required: question, 2–6 options and a valid correct option are mandatory.",
                 style = MaterialTheme.typography.bodySmall
               )
