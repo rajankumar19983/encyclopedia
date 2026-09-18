@@ -23,44 +23,27 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.rajankumar.encyclopaedia.feature.common.FeaturePlaceholderScreen
 import com.rajankumar.encyclopaedia.feature.home.HomeScreen
 import com.rajankumar.encyclopaedia.feature.knowledge.KnowledgeScreen
+import com.rajankumar.encyclopaedia.feature.performance.PerformanceScreen
 import com.rajankumar.encyclopaedia.feature.questions.PracticeScreen
 import com.rajankumar.encyclopaedia.feature.questions.QuestionBankScreen
+import com.rajankumar.encyclopaedia.feature.revision.RevisionScreen
 
 @Composable
 fun EncyclopaediaShell(navController: NavHostController, useNavigationRail: Boolean) {
   val backStackEntry by navController.currentBackStackEntryAsState()
   val currentRoute = backStackEntry?.destination?.route
-
   if (useNavigationRail) {
     Row(Modifier.fillMaxSize()) {
-      NavigationRail(header = {
-        Text("Encyclopaedia", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(16.dp))
-      }) {
+      NavigationRail(header = { Text("Encyclopaedia", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(16.dp)) }) {
         AppDestination.entries.forEach { destination ->
-          NavigationRailItem(
-            selected = currentRoute == destination.route,
-            onClick = { navigateSingleTop(navController, destination.route) },
-            icon = { Icon(destination.icon, destination.label) },
-            label = { Text(destination.label) }
-          )
+          NavigationRailItem(selected = currentRoute == destination.route, onClick = { navigateSingleTop(navController, destination.route) }, icon = { Icon(destination.icon, destination.label) }, label = { Text(destination.label) })
         }
       }
       Box(Modifier.weight(1f)) { EncyclopaediaNavHost(navController) }
     }
   } else {
     val compact = listOf(AppDestination.Home, AppDestination.Learn, AppDestination.Questions, AppDestination.Practice, AppDestination.Settings)
-    Scaffold(bottomBar = {
-      NavigationBar {
-        compact.forEach { destination ->
-          NavigationBarItem(
-            selected = currentRoute == destination.route,
-            onClick = { navigateSingleTop(navController, destination.route) },
-            icon = { Icon(destination.icon, destination.label) },
-            label = { Text(destination.label) }
-          )
-        }
-      }
-    }) { padding ->
+    Scaffold(bottomBar = { NavigationBar { compact.forEach { destination -> NavigationBarItem(selected = currentRoute == destination.route, onClick = { navigateSingleTop(navController, destination.route) }, icon = { Icon(destination.icon, destination.label) }, label = { Text(destination.label) }) } } }) { padding ->
       Box(Modifier.padding(padding)) { EncyclopaediaNavHost(navController) }
     }
   }
@@ -72,22 +55,16 @@ private fun EncyclopaediaNavHost(navController: NavHostController) {
     composable(AppDestination.Home.route) { HomeScreen() }
     composable(AppDestination.Learn.route) { KnowledgeScreen() }
     composable(AppDestination.Questions.route) { QuestionBankScreen() }
-    composable(AppDestination.Practice.route) {
-      PracticeScreen(onDone = { navigateSingleTop(navController, AppDestination.Questions.route) })
-    }
-    composable(AppDestination.Revision.route) { FeaturePlaceholderScreen("Revision", "Your mistakes, weak topics, bookmarks and scheduled revisions will collect here.") }
+    composable(AppDestination.Practice.route) { PracticeScreen(onDone = { navigateSingleTop(navController, AppDestination.Questions.route) }) }
+    composable(AppDestination.Revision.route) { RevisionScreen() }
     composable(AppDestination.Planner.route) { FeaturePlaceholderScreen("Daily Planner", "Plan learning, revision, practice and PYQ work for each day.") }
     composable(AppDestination.Pyq.route) { FeaturePlaceholderScreen("PYQ Papers", "Organize official previous-year questions by exam, year, paper and shift.") }
-    composable(AppDestination.Performance.route) { FeaturePlaceholderScreen("Performance", "Accuracy, attempts, streaks, topic performance and weak areas will use your real study data.") }
+    composable(AppDestination.Performance.route) { PerformanceScreen() }
     composable(AppDestination.Backup.route) { FeaturePlaceholderScreen("Backup & Restore", "Export and safely restore your complete local Encyclopaedia data.") }
     composable(AppDestination.Settings.route) { FeaturePlaceholderScreen("Settings", "Configure study preferences, accessibility, OCR/import behavior and optional AI services.") }
   }
 }
 
 private fun navigateSingleTop(navController: NavHostController, route: String) {
-  navController.navigate(route) {
-    launchSingleTop = true
-    restoreState = true
-    popUpTo(AppDestination.Home.route) { saveState = true }
-  }
+  navController.navigate(route) { launchSingleTop = true; restoreState = true; popUpTo(AppDestination.Home.route) { saveState = true } }
 }
