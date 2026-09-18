@@ -10,13 +10,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -37,25 +37,32 @@ import kotlinx.coroutines.launch
 fun PracticeScreen(onDone: () -> Unit) {
   val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
   val scope = rememberCoroutineScope()
-  val sessionId = remember { UUID.randomUUID().toString() }
+  var config by remember { mutableStateOf<PracticeSessionConfig?>(null) }
   var questions by remember { mutableStateOf<List<QuestionEntity>?>(null) }
+  var sessionId by remember { mutableStateOf(newPracticeSessionId()) }
   var index by remember { mutableStateOf(0) }
   var selected by remember { mutableStateOf<String?>(null) }
   var submitted by remember { mutableStateOf(false) }
   var startedAt by remember { mutableLongStateOf(System.currentTimeMillis()) }
   var reviews by remember { mutableStateOf<List<PracticeAnswerReview>>(emptyList()) }
 
-  LaunchedEffect(Unit) {
-    questions = dao.getRandomQuestions(PracticeConstants.maxSessionQuestions)
-      .filter { it.validateForPractice().valid }
-      .take(PracticeConfig.defaultSessionSize)
+  if (config == null) {
+    PracticeSetup(
+      onStart = { chosen ->
+        config = chosen
+        questions = null
+        scope.launch { questions = dao.loadPracticeQuestions(chosen.mode, chosen.safeQuestionCount) }
+      },
+      onDone = onDone
+    )
+    return
   }
 
   val sessionQuestions = questions
   if (sessionQuestions == null) {
     Column(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
       Text("Practice", style = MaterialTheme.typography.headlineMedium)
-      Text("Preparing a valid practice session…")
+      Text("Preparing ${config!!.mode.label.lowercase()} practice…")
       LinearProgressIndicator(Modifier.fillMaxWidth())
     }
     return
@@ -64,7 +71,8 @@ fun PracticeScreen(onDone: () -> Unit) {
   if (sessionQuestions.isEmpty()) {
     Column(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
       Text("Practice", style = MaterialTheme.typography.headlineMedium)
-      Text("No practice-ready questions were found. Questions need printed question text, 2–6 options and a valid correct answer.")
+      Text(config!!.mode.emptyMessage())
+      Button(onClick = { config = null; questions = null }) { Text("Choose another mode") }
       TextButton(onClick = onDone) { Text("Back to Question Bank") }
     }
     return
@@ -72,15 +80,10 @@ fun PracticeScreen(onDone: () -> Unit) {
 
   if (index >= sessionQuestions.size) {
     val summary = reviews.summary()
-    LazyColumn(
-      Modifier.fillMaxSize().padding(28.dp),
-      verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-      item { Text("Session complete", style = MaterialTheme.typography.headlineMedium) }
-      item { Text("${summary.correct} / ${summary.total} correct", style = MaterialTheme.typography.headlineLarge) }
-      item { Text("${summary.accuracyPercent}% accuracy • ${formatPracticeDuration(summary.totalTimeMs)} total") }
+    LazyColumn(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+      item { Text(summary.resultHeadline(), style = MaterialTheme.typography.headlineMedium) }
+      item { Text(summary.resultDetail(), style = MaterialTheme.typography.titleLarge) }
       item { Text(practiceFeedback(summary.correct, summary.total), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-
       val incorrect = reviews.incorrectOnly()
       if (incorrect.isNotEmpty()) {
         item { Text("Review mistakes", style = MaterialTheme.typography.titleLarge) }
@@ -91,15 +94,28 @@ fun PracticeScreen(onDone: () -> Unit) {
                 Text(review.question.questionText, style = MaterialTheme.typography.titleMedium)
                 Text("Your answer: ${review.question.answerLabel(review.selectedAnswer)}")
                 Text("Correct: ${review.question.answerLabel(review.question.correctAnswer)}", color = MaterialTheme.colorScheme.primary)
-                review.question.explanation?.takeIf(String::isNotBlank)?.let {
-                  Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                review.question.explanation?.takeIf(String::isNotBlank)?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
               }
             }
           }
         }
       }
-      item { Button(onClick = onDone) { Text("Back to Question Bank") } }
+      item {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+          Button(onClick = {
+            config = PracticeSessionConfig(PracticeMode.MISTAKES, minOf(incorrect.size.coerceAtLeast(5), 20))
+            questions = null
+            index = 0
+            selected = null
+            submitted = false
+            reviews = emptyList()
+            sessionId = newPracticeSessionId()
+            scope.launch { questions = dao.loadPracticeQuestions(PracticeMode.MISTAKES, 20) }
+          }, enabled = incorrect.isNotEmpty()) { Text("Practise mistakes") }
+          Button(onClick = { config = null; questions = null; index = 0; reviews = emptyList(); sessionId = newPracticeSessionId() }) { Text("New session") }
+        }
+      }
+      item { TextButton(onClick = onDone) { Text("Back to Question Bank") } }
     }
     return
   }
@@ -109,20 +125,19 @@ fun PracticeScreen(onDone: () -> Unit) {
   val correctAnswer = question.correctAnswer.trim().uppercase()
   val progress = PracticeProgress(index + 1, sessionQuestions.size)
 
-  LazyColumn(
-    Modifier.fillMaxSize().padding(28.dp),
-    verticalArrangement = Arrangement.spacedBy(16.dp)
-  ) {
+  LazyColumn(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
     item {
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text("Practice", style = MaterialTheme.typography.headlineMedium)
+        Column {
+          Text("Practice", style = MaterialTheme.typography.headlineMedium)
+          Text(config!!.mode.label, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         Text(progress.label)
       }
     }
     item { LinearProgressIndicator(progress = { progress.fraction }, modifier = Modifier.fillMaxWidth()) }
     item { Text("Score: ${reviews.count { it.wasCorrect }}", color = MaterialTheme.colorScheme.primary) }
     item { Text(question.questionText, style = MaterialTheme.typography.titleLarge) }
-
     options.forEachIndexed { optionIndex, option ->
       val letter = optionLetter(optionIndex)
       item(key = "$index-$letter") {
@@ -134,57 +149,54 @@ fun PracticeScreen(onDone: () -> Unit) {
         }
       }
     }
-
     item {
       if (!submitted) {
-        Button(
-          onClick = {
-            val answer = selected ?: return@Button
-            val evaluation = question.evaluateAnswer(answer)
-            val timeTaken = (System.currentTimeMillis() - startedAt).coerceAtLeast(0)
-            reviews = reviews + PracticeAnswerReview(question, answer, evaluation.isCorrect, timeTaken)
-            submitted = true
-            scope.launch {
-              dao.insertAttempt(
-                QuestionAttemptEntity(
-                  id = UUID.randomUUID().toString(),
-                  questionId = question.id,
-                  sessionId = sessionId,
-                  selectedAnswer = evaluation.selected,
-                  isCorrect = evaluation.isCorrect,
-                  timeTakenMs = timeTaken
-                )
-              )
-            }
-          },
-          enabled = selected != null
-        ) { Text("Check Answer") }
+        Button(onClick = {
+          val answer = selected ?: return@Button
+          val evaluation = question.evaluateAnswer(answer)
+          val timeTaken = elapsedAnswerTime(startedAt)
+          reviews = reviews + PracticeAnswerReview(question, answer, evaluation.isCorrect, timeTaken)
+          submitted = true
+          scope.launch {
+            dao.insertAttempt(QuestionAttemptEntity(UUID.randomUUID().toString(), question.id, sessionId, evaluation.selected, evaluation.isCorrect, timeTaken))
+          }
+        }, enabled = selected != null) { Text("Check Answer") }
       } else {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
           val correct = selected == correctAnswer
-          Text(
-            if (correct) "Correct ✓" else "Incorrect. Correct answer: ${question.answerLabel(correctAnswer)}",
-            color = if (correct) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-            style = MaterialTheme.typography.titleMedium
-          )
+          Text(if (correct) "Correct ✓" else "Incorrect. Correct answer: ${question.answerLabel(correctAnswer)}", color = if (correct) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.titleMedium)
           question.explanation?.takeIf(String::isNotBlank)?.let {
-            Card(Modifier.fillMaxWidth()) {
-              Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Explanation", style = MaterialTheme.typography.titleMedium)
-                Text(it)
-              }
-            }
+            Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { Text("Explanation", style = MaterialTheme.typography.titleMedium); Text(it) } }
           }
-          Button(onClick = {
-            index++
-            selected = null
-            submitted = false
-            startedAt = System.currentTimeMillis()
-          }) { Text(if (index == sessionQuestions.lastIndex) "Finish" else "Next Question") }
+          Button(onClick = { index++; selected = null; submitted = false; startedAt = System.currentTimeMillis() }) { Text(if (index == sessionQuestions.lastIndex) "Finish" else "Next Question") }
         }
       }
     }
-
     item { TextButton(onClick = onDone) { Text("End session") } }
+  }
+}
+
+@Composable
+private fun PracticeSetup(onStart: (PracticeSessionConfig) -> Unit, onDone: () -> Unit) {
+  var mode by remember { mutableStateOf(PracticeMode.RANDOM) }
+  var count by remember { mutableStateOf(PracticeConfig.defaultSessionSize) }
+  Column(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+    Text("Practice", style = MaterialTheme.typography.headlineMedium)
+    Text("Choose what you want to practise. Nothing is marked correct until you submit an answer.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text("Mode", style = MaterialTheme.typography.titleMedium)
+    PracticeMode.entries.forEach { option ->
+      Card(Modifier.fillMaxWidth().clickable { mode = option }) {
+        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+          RadioButton(selected = mode == option, onClick = { mode = option })
+          Column(Modifier.padding(start = 8.dp)) { Text(option.label, style = MaterialTheme.typography.titleSmall); Text(option.description, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+      }
+    }
+    Text("Questions", style = MaterialTheme.typography.titleMedium)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      PracticeConfig.sessionSizes.forEach { size -> FilterChip(selected = count == size, onClick = { count = size }, label = { Text(size.toString()) }) }
+    }
+    Button(onClick = { onStart(PracticeSessionConfig(mode, count)) }) { Text("Start practice") }
+    TextButton(onClick = onDone) { Text("Back to Question Bank") }
   }
 }
