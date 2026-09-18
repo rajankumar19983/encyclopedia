@@ -42,8 +42,13 @@ import kotlinx.coroutines.launch
 @Composable
 fun QuestionBankScreen() {
   var importing by remember { mutableStateOf(false) }
+  var practising by remember { mutableStateOf(false) }
   if (importing) {
     QuestionImportScreen(onDone = { importing = false })
+    return
+  }
+  if (practising) {
+    PracticeScreen(onDone = { practising = false })
     return
   }
 
@@ -61,7 +66,8 @@ fun QuestionBankScreen() {
         Text("${questions.size} questions stored locally", color = MaterialTheme.colorScheme.onSurfaceVariant)
       }
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = { importing = true }) { Text("Scan Image") }
+        Button(onClick = { practising = true }, enabled = questions.isNotEmpty()) { Text("Practice") }
+        Button(onClick = { importing = true }) { Text("Scan / PDF") }
         Button(onClick = { editing = null; showEditor = true }) {
           Icon(Icons.Default.Add, null)
           Text(" Add Question")
@@ -69,7 +75,7 @@ fun QuestionBankScreen() {
       }
     }
 
-    if (questions.isEmpty()) Text("No questions yet. Add one manually or scan a printed MCQ image.")
+    if (questions.isEmpty()) Text("No questions yet. Add one manually or import printed MCQs from an image/PDF.")
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
       items(questions, key = { it.id }) { question ->
         Card(Modifier.fillMaxWidth()) {
@@ -123,7 +129,6 @@ private fun QuestionEditorDialog(
   var explanation by remember(existing) { mutableStateOf(existing?.explanation.orEmpty()) }
   var difficulty by remember(existing) { mutableStateOf(existing?.difficulty ?: "MEDIUM") }
   var selectedTopic by remember { mutableStateOf<String?>(null) }
-
   val valid = questionText.isNotBlank() && options.size in 2..6 && options.all { it.isNotBlank() } && correctIndex in options.indices
 
   AlertDialog(
