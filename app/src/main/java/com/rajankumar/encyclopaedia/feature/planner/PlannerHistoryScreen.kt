@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rajankumar.encyclopaedia.data.local.EncyclopaediaDatabase
+import java.util.Locale
 
 @Composable
 fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
@@ -26,6 +27,10 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
   val streak = history.completionStreak(plannerDate())
   val summary = history.historySummary()
   val consistency = history.consistencyPercent()
+  val recentCompletion = history.recentCompletionPercent()
+  val bestDay = history.bestPlannerDay()
+  val busiestDay = history.busiestPlannerDay()
+  val averageTasks = history.averageTasksPerPlannedDay()
 
   LazyColumn(
     modifier = modifier.padding(28.dp),
@@ -33,10 +38,7 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
   ) {
     item {
       Text("Planner history", style = MaterialTheme.typography.headlineMedium)
-      Text(
-        "Review how much of each day's study plan you completed.",
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-      )
+      Text("Review how much of each day's study plan you completed.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 
     if (history.isNotEmpty()) {
@@ -56,6 +58,17 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
             Text("Consistency", style = MaterialTheme.typography.titleMedium)
             LinearProgressIndicator(progress = { consistency / 100f }, modifier = Modifier.fillMaxWidth())
             Text("$consistency% of planned days fully completed")
+          }
+        }
+      }
+      item {
+        Card(Modifier.fillMaxWidth()) {
+          Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Study planning insights", style = MaterialTheme.typography.titleMedium)
+            Text("Recent completion: $recentCompletion%")
+            Text("Average plan size: ${String.format(Locale.US, "%.1f", averageTasks)} tasks/day")
+            bestDay?.let { Text("Best day: ${plannerDisplayDate(it.date)} • ${it.completed}/${it.total} completed") }
+            busiestDay?.let { Text("Busiest day: ${plannerDisplayDate(it.date)} • ${it.total} tasks planned") }
           }
         }
       }
