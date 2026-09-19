@@ -20,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -29,11 +30,13 @@ import com.rajankumar.encyclopaedia.data.local.EncyclopaediaDatabase
 import com.rajankumar.encyclopaedia.data.local.PlannerTaskEntity
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
 fun PlannerScreen() {
   val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
+  val scope = rememberCoroutineScope()
   val today = remember { plannerDate() }
   val tasks by dao.observePlannerTasks(today).collectAsStateWithLifecycle(emptyList())
   var title by remember { mutableStateOf("") }
@@ -69,7 +72,7 @@ fun PlannerScreen() {
             onClick = {
               val cleanTitle = title.trim()
               title = ""
-              kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+              scope.launch(Dispatchers.IO) {
                 dao.upsertPlannerTask(
                   PlannerTaskEntity(
                     id = UUID.randomUUID().toString(),
@@ -92,7 +95,7 @@ fun PlannerScreen() {
             Checkbox(
               checked = task.isCompleted,
               onCheckedChange = { completed ->
-                kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                scope.launch(Dispatchers.IO) {
                   dao.setPlannerTaskCompleted(task.id, completed, if (completed) System.currentTimeMillis() else null)
                 }
               }
@@ -104,7 +107,7 @@ fun PlannerScreen() {
               }
             }
             IconButton(onClick = {
-              kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch { dao.deletePlannerTask(task.id) }
+              scope.launch(Dispatchers.IO) { dao.deletePlannerTask(task.id) }
             }) { Text("×") }
           }
         }
