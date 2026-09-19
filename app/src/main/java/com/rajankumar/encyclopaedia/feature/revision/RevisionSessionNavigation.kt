@@ -1,8 +1,8 @@
 package com.rajankumar.encyclopaedia.feature.revision
 
-fun RevisionSessionState.nextQuestionId(): Long? =
+fun RevisionSessionState.nextQuestionId(): String? =
   questionIds.firstOrNull { it !in completedQuestionIds }
 
-fun RevisionSessionState.contains(questionId: Long): Boolean = questionId in questionIds
+fun RevisionSessionState.contains(questionId: String): Boolean = questionId in questionIds
 
-fun RevisionSessionState.isCompleted(questionId: Long): Boolean = questionId in completedQuestionIds
+fun RevisionSessionState.isCompleted(questionId: String): Boolean = questionId in completedQuestionIds
