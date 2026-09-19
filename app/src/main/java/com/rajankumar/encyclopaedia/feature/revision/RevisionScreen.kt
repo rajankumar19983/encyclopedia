@@ -39,9 +39,10 @@ fun RevisionScreen() {
   val badge = remember(queue) { queue.revisionBadge() }
   val recommendedLimit = remember(queue.size) { recommendedRevisionLimit(queue.size) }
   val session = remember(queue, recommendedLimit) { if (recommendedLimit == 0) null else RevisionSession(queue, recommendedLimit) }
-  val sessionProgress = remember(queue.size, recommendedLimit) {
-    RevisionProgress(completed = 0, total = recommendedLimit)
+  var sessionState by remember(session?.questions?.map { it.id }) {
+    mutableStateOf(session?.state())
   }
+  val sessionProgress = sessionState?.progress ?: RevisionProgress(0, 0)
 
   LazyColumn(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
     item {
