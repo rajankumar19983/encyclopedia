@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -38,6 +39,9 @@ fun RevisionScreen() {
   val badge = remember(queue) { queue.revisionBadge() }
   val recommendedLimit = remember(queue.size) { recommendedRevisionLimit(queue.size) }
   val session = remember(queue, recommendedLimit) { if (recommendedLimit == 0) null else RevisionSession(queue, recommendedLimit) }
+  val sessionProgress = remember(queue.size, recommendedLimit) {
+    RevisionProgress(completed = 0, total = recommendedLimit)
+  }
 
   LazyColumn(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
     item {
@@ -56,9 +60,11 @@ fun RevisionScreen() {
     session?.let { currentSession ->
       item {
         Card(Modifier.fillMaxWidth()) {
-          Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+          Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Recommended session", style = MaterialTheme.typography.titleMedium)
             Text("Revise ${currentSession.questions.size} ${if (currentSession.questions.size == 1) "question" else "questions"} next.")
+            LinearProgressIndicator(progress = { sessionProgress.percent / 100f }, modifier = Modifier.fillMaxWidth())
+            Text("${sessionProgress.completed} of ${sessionProgress.total} completed", style = MaterialTheme.typography.bodySmall)
             Text("The highest-priority questions are placed first.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
           }
         }
@@ -74,9 +80,7 @@ fun RevisionScreen() {
       }
       item {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          RevisionSort.entries.forEach { option ->
-            FilterChip(selected = sort == option, onClick = { sort = option }, label = { Text(option.label()) })
-          }
+          RevisionSort.entries.forEach { option -> FilterChip(selected = sort == option, onClick = { sort = option }, label = { Text(option.label()) }) }
         }
       }
     }
