@@ -114,6 +114,9 @@ interface EncyclopaediaDao {
   @Query("SELECT * FROM planner_tasks WHERE scheduledDate = :date ORDER BY isCompleted, createdAt")
   fun observePlannerTasks(date: String): Flow<List<PlannerTaskEntity>>
 
+  @Query("SELECT * FROM planner_tasks ORDER BY scheduledDate DESC, createdAt")
+  fun observeAllPlannerTasks(): Flow<List<PlannerTaskEntity>>
+
   @Query("SELECT * FROM planner_tasks WHERE scheduledDate < :date AND isCompleted = 0 ORDER BY scheduledDate, createdAt")
   suspend fun getIncompletePlannerTasksBefore(date: String): List<PlannerTaskEntity>
 
