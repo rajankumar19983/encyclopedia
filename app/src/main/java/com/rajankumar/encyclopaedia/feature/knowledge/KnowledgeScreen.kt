@@ -12,6 +12,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -34,6 +36,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rajankumar.encyclopaedia.data.local.EncyclopaediaDatabase
 import com.rajankumar.encyclopaedia.data.local.KnowledgeNodeEntity
 import com.rajankumar.encyclopaedia.data.local.LessonEntity
+import com.rajankumar.encyclopaedia.feature.accessibility.SpeakableContent
+import com.rajankumar.encyclopaedia.feature.accessibility.rememberTextToSpeechController
 import java.util.UUID
 import kotlinx.coroutines.launch
 
@@ -42,6 +46,7 @@ fun KnowledgeScreen() {
   val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
   val roots by dao.observeRootNodes().collectAsStateWithLifecycle(emptyList())
   val scope = rememberCoroutineScope()
+  val speech = rememberTextToSpeechController()
   var selected by remember { mutableStateOf<KnowledgeNodeEntity?>(null) }
   var addNode by remember { mutableStateOf(false) }
   var addLesson by remember { mutableStateOf(false) }
@@ -72,7 +77,7 @@ fun KnowledgeScreen() {
     ) {
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Row {
-          IconButton(onClick = { selected = null }) {
+          IconButton(onClick = { speech.stop(); selected = null }) {
             Icon(Icons.Default.ArrowBack, "Back")
           }
           Column {
@@ -108,7 +113,21 @@ fun KnowledgeScreen() {
         items(lessons, key = { it.id }) { lesson ->
           Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-              Text(lesson.title, style = MaterialTheme.typography.titleMedium)
+              Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(lesson.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Row {
+                  IconButton(
+                    onClick = {
+                      speech.speak(SpeakableContent(title = lesson.title, body = lesson.content))
+                    }
+                  ) {
+                    Icon(Icons.Default.VolumeUp, "Read lesson aloud")
+                  }
+                  IconButton(onClick = speech::stop) {
+                    Icon(Icons.Default.Stop, "Stop reading")
+                  }
+                }
+              }
               Text(lesson.content, maxLines = 5, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
           }
