@@ -19,6 +19,9 @@ interface EncyclopaediaDao {
   @Query("SELECT * FROM knowledge_nodes WHERE isArchived = 0 ORDER BY name")
   fun observeAllNodes(): Flow<List<KnowledgeNodeEntity>>
 
+  @Query("SELECT * FROM knowledge_nodes ORDER BY createdAt")
+  suspend fun getAllNodesForBackup(): List<KnowledgeNodeEntity>
+
   @Query("SELECT COUNT(*) FROM knowledge_nodes WHERE isArchived = 0")
   fun observeTopicCount(): Flow<Int>
 
@@ -32,6 +35,9 @@ interface EncyclopaediaDao {
 
   @Query("SELECT * FROM lessons WHERE knowledgeNodeId = :nodeId AND isArchived = 0 ORDER BY sortOrder, title")
   fun observeLessons(nodeId: String): Flow<List<LessonEntity>>
+
+  @Query("SELECT * FROM lessons ORDER BY createdAt")
+  suspend fun getAllLessonsForBackup(): List<LessonEntity>
 
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   suspend fun upsertLesson(lesson: LessonEntity)
@@ -59,6 +65,9 @@ interface EncyclopaediaDao {
 
   @Query("DELETE FROM questions WHERE id = :id")
   suspend fun deleteQuestion(id: String)
+
+  @Query("SELECT * FROM question_topics ORDER BY questionId, knowledgeNodeId")
+  suspend fun getAllQuestionTopicsForBackup(): List<QuestionTopicEntity>
 
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   suspend fun upsertQuestionTopic(link: QuestionTopicEntity)
@@ -116,6 +125,9 @@ interface EncyclopaediaDao {
 
   @Query("SELECT * FROM planner_tasks ORDER BY scheduledDate DESC, createdAt")
   fun observeAllPlannerTasks(): Flow<List<PlannerTaskEntity>>
+
+  @Query("SELECT * FROM planner_tasks ORDER BY scheduledDate, createdAt")
+  suspend fun getAllPlannerTasksForBackup(): List<PlannerTaskEntity>
 
   @Query("SELECT * FROM planner_tasks WHERE scheduledDate < :date AND isCompleted = 0 ORDER BY scheduledDate, createdAt")
   suspend fun getIncompletePlannerTasksBefore(date: String): List<PlannerTaskEntity>
