@@ -42,6 +42,7 @@ fun PlannerScreen() {
   val tasks by dao.observePlannerTasks(today).collectAsStateWithLifecycle(emptyList())
   val orderedTasks = tasks.orderedForPlanner()
   val progress = tasks.plannerProgress()
+  val carryOver = tasks.carryOverSummary()
   var title by remember { mutableStateOf("") }
 
   LaunchedEffect(today) {
@@ -59,6 +60,19 @@ fun PlannerScreen() {
       Text("Daily Planner", style = MaterialTheme.typography.headlineMedium)
       Text(plannerDisplayDate(today), color = MaterialTheme.colorScheme.onSurfaceVariant)
       Text(progress.summaryText(), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 6.dp))
+    }
+    if (carryOver.carriedCount > 0) {
+      item {
+        Card(Modifier.fillMaxWidth()) {
+          Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Carried-over work", style = MaterialTheme.typography.titleMedium)
+            Text("${carryOver.carriedCount} unfinished ${if (carryOver.carriedCount == 1) "task was" else "tasks were"} moved into today.")
+            carryOver.oldestSourceDate?.let {
+              Text("Oldest pending since ${plannerDisplayDate(it)}.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+          }
+        }
+      }
     }
     if (progress.total > 0) {
       item {
