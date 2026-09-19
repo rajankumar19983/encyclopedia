@@ -1,6 +1,6 @@
-package com.rajankumar19983.encyclopaedia.feature.planner
+package com.rajankumar.encyclopaedia.feature.planner
 
-import com.rajankumar19983.encyclopaedia.data.local.PlannerTaskEntity
+import com.rajankumar.encyclopaedia.data.local.PlannerTaskEntity
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
