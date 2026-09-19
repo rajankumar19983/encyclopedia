@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -17,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,12 +49,36 @@ fun PlannerScreen() {
   val stats = tasks.completionStats()
   var title by remember { mutableStateOf("") }
   var showHistory by remember { mutableStateOf(false) }
+  var editingTaskId by remember { mutableStateOf<String?>(null) }
+  var editTitle by remember { mutableStateOf("") }
+  var taskToDelete by remember { mutableStateOf<PlannerTaskEntity?>(null) }
 
   LaunchedEffect(today) {
     withContext(Dispatchers.IO) {
       val overdue = dao.getIncompletePlannerTasksBefore(today)
       carryIncompleteTasks(overdue, today).forEach { dao.upsertPlannerTask(it) }
     }
+  }
+
+  taskToDelete?.let { task ->
+    AlertDialog(
+      onDismissRequest = { taskToDelete = null },
+      title = { Text("Delete task?") },
+      text = { Text(plannerDeleteMessage(task.title)) },
+      confirmButton = {
+        TextButton(onClick = {
+          taskToDelete = null
+          if (editingTaskId == task.id) {
+            editingTaskId = null
+            editTitle = ""
+          }
+          scope.launch(Dispatchers.IO) { dao.deletePlannerTask(task.id) }
+        }) { Text("Delete") }
+      },
+      dismissButton = {
+        TextButton(onClick = { taskToDelete = null }) { Text("Cancel") }
+      }
+    )
   }
 
   if (showHistory) {
@@ -156,15 +182,45 @@ fun PlannerScreen() {
                 }
               }
             )
-            Column(Modifier.weight(1f)) {
-              Text(task.title, style = MaterialTheme.typography.titleMedium)
-              task.carriedFromDate?.let {
-                Text("Carried from ${plannerDisplayDate(it)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+              if (editingTaskId == task.id) {
+                OutlinedTextField(
+                  value = editTitle,
+                  onValueChange = { editTitle = plannerTaskEditValue(it) },
+                  label = { Text("Study task") },
+                  supportingText = { Text("${editTitle.length}/160") },
+                  modifier = Modifier.fillMaxWidth(),
+                  singleLine = true
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                  Button(
+                    enabled = canSavePlannerTaskEdit(editTitle),
+                    onClick = {
+                      val savedTitle = savedPlannerTaskTitle(editTitle)
+                      editingTaskId = null
+                      editTitle = ""
+                      scope.launch(Dispatchers.IO) {
+                        dao.updatePlannerTaskTitle(task.id, savedTitle)
+                      }
+                    }
+                  ) { Text("Save") }
+                  OutlinedButton(onClick = {
+                    editingTaskId = null
+                    editTitle = ""
+                  }) { Text("Cancel") }
+                }
+              } else {
+                Text(task.title, style = MaterialTheme.typography.titleMedium)
+                task.carriedFromDate?.let {
+                  Text("Carried from ${plannerDisplayDate(it)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                TextButton(onClick = {
+                  editingTaskId = task.id
+                  editTitle = plannerTaskEditValue(task.title)
+                }) { Text("Edit") }
               }
             }
-            IconButton(onClick = {
-              scope.launch(Dispatchers.IO) { dao.deletePlannerTask(task.id) }
-            }) { Text("×") }
+            IconButton(onClick = { taskToDelete = task }) { Text("×") }
           }
         }
       }
