@@ -14,6 +14,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,12 +46,24 @@ fun PlannerScreen() {
   val carryOver = tasks.carryOverSummary()
   val stats = tasks.completionStats()
   var title by remember { mutableStateOf("") }
+  var showHistory by remember { mutableStateOf(false) }
 
   LaunchedEffect(today) {
     withContext(Dispatchers.IO) {
       val overdue = dao.getIncompletePlannerTasksBefore(today)
       carryIncompleteTasks(overdue, today).forEach { dao.upsertPlannerTask(it) }
     }
+  }
+
+  if (showHistory) {
+    Column(Modifier.fillMaxSize()) {
+      OutlinedButton(
+        onClick = { showHistory = false },
+        modifier = Modifier.padding(start = 28.dp, top = 20.dp)
+      ) { Text("Back to today") }
+      PlannerHistoryScreen(Modifier.weight(1f))
+    }
+    return
   }
 
   LazyColumn(
@@ -61,6 +74,10 @@ fun PlannerScreen() {
       Text("Daily Planner", style = MaterialTheme.typography.headlineMedium)
       Text(plannerDisplayDate(today), color = MaterialTheme.colorScheme.onSurfaceVariant)
       Text(progress.summaryText(), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 6.dp))
+      OutlinedButton(
+        onClick = { showHistory = true },
+        modifier = Modifier.padding(top = 10.dp)
+      ) { Text("View history") }
     }
     if (carryOver.carriedCount > 0) {
       item {
