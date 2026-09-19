@@ -20,6 +20,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.rajankumar.encyclopaedia.feature.accessibility.AccessibilitySettingsScreen
 import com.rajankumar.encyclopaedia.feature.common.FeaturePlaceholderScreen
 import com.rajankumar.encyclopaedia.feature.home.HomeScreen
 import com.rajankumar.encyclopaedia.feature.knowledge.KnowledgeScreen
@@ -64,7 +65,7 @@ private fun EncyclopaediaNavHost(navController: NavHostController) {
     composable(AppDestination.Pyq.route) { FeaturePlaceholderScreen("PYQ Papers", "Organize official previous-year questions by exam, year, paper and shift.") }
     composable(AppDestination.Performance.route) { PerformanceScreen() }
     composable(AppDestination.Backup.route) { FeaturePlaceholderScreen("Backup & Restore", "Export and safely restore your complete local Encyclopaedia data.") }
-    composable(AppDestination.Settings.route) { FeaturePlaceholderScreen("Settings", "Configure study preferences, accessibility, OCR/import behavior and optional AI services.") }
+    composable(AppDestination.Settings.route) { AccessibilitySettingsScreen() }
   }
 }
 
