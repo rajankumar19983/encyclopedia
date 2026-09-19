@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
@@ -26,7 +27,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rajankumar.encyclopaedia.data.local.EncyclopaediaDatabase
 
 @Composable
-fun RevisionScreen() {
+fun RevisionScreen(onStartPractice: () -> Unit = {}) {
   val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
   val questions by dao.observeQuestions().collectAsStateWithLifecycle(emptyList())
   val attempts by dao.observeAllAttempts().collectAsStateWithLifecycle(emptyList())
@@ -39,9 +40,7 @@ fun RevisionScreen() {
   val badge = remember(queue) { queue.revisionBadge() }
   val recommendedLimit = remember(queue.size) { recommendedRevisionLimit(queue.size) }
   val session = remember(queue, recommendedLimit) { if (recommendedLimit == 0) null else RevisionSession(queue, recommendedLimit) }
-  var sessionState by remember(session?.questions?.map { it.id }) {
-    mutableStateOf(session?.state())
-  }
+  var sessionState by remember(session?.questions?.map { it.id }) { mutableStateOf(session?.state()) }
   val sessionProgress = sessionState?.progress ?: RevisionProgress(0, 0)
 
   LazyColumn(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -67,6 +66,10 @@ fun RevisionScreen() {
             LinearProgressIndicator(progress = { sessionProgress.percent / 100f }, modifier = Modifier.fillMaxWidth())
             Text("${sessionProgress.completed} of ${sessionProgress.total} completed", style = MaterialTheme.typography.bodySmall)
             Text("The highest-priority questions are placed first.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Button(onClick = {
+              RevisionPracticeRequest.set(currentSession.questions.map { it.id })
+              onStartPractice()
+            }) { Text("Start revision practice") }
           }
         }
       }
