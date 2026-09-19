@@ -121,11 +121,17 @@ interface EncyclopaediaDao {
   @Transaction
   suspend fun saveImportedQuestionIfUnique(question: QuestionEntity, topicId: String?): Boolean {
     val incomingQuestion = importFingerprint(question.questionText)
-    val duplicate = getAllQuestionsOnce().any { importFingerprint(it.questionText) == incomingQuestion }
+    val incomingOptions = question.options.lines().map(::importFingerprint).filter { it.isNotBlank() }
+    val duplicate = getAllQuestionsOnce().any { existing ->
+      importFingerprint(existing.questionText) == incomingQuestion &&
+        existing.options.lines().map(::importFingerprint).filter { it.isNotBlank() } == incomingOptions
+    }
     if (duplicate) return false
     saveQuestion(question, topicId)
     return true
   }
 }
 
-private fun importFingerprint(value: String): String = value.trim().lowercase().replace(Regex("\\s+"), " ")
+private fun importFingerprint(value: String): String = value
+  .lowercase()
+  .replace(Regex("[^\\p{L}\\p{N}]+"), "")
