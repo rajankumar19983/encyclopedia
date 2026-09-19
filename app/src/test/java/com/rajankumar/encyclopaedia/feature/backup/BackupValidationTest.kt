@@ -46,8 +46,17 @@ class BackupValidationTest {
   }
 
   private fun validSnapshot(): BackupSnapshot {
-    val node = KnowledgeNodeEntity(id = "node", name = "Operating Systems", type = "topic")
-    val lesson = LessonEntity(id = "lesson", knowledgeNodeId = node.id, title = "Processes")
+    val node = KnowledgeNodeEntity(
+      id = "node",
+      parentId = null,
+      name = "Operating Systems"
+    )
+    val lesson = LessonEntity(
+      id = "lesson",
+      knowledgeNodeId = node.id,
+      title = "Processes",
+      content = "A process is a program in execution."
+    )
     val question = QuestionEntity(
       id = "question",
       questionText = "What is a process?",
@@ -58,8 +67,10 @@ class BackupValidationTest {
     val attempt = QuestionAttemptEntity(
       id = "attempt",
       questionId = question.id,
+      sessionId = "session",
       selectedAnswer = "Program in execution",
-      isCorrect = true
+      isCorrect = true,
+      timeTakenMs = 1_000L
     )
     val plannerTask = PlannerTaskEntity(id = "planner", title = "Revise OS", scheduledDate = "2026-09-19")
     val manifest = BackupManifest(
