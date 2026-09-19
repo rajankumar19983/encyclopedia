@@ -34,11 +34,30 @@ fun RevisionScreen() {
   var priority by remember { mutableStateOf<RevisionPriority?>(null) }
   val visible = remember(queue, query, priority) { queue.filterRevisionQueue(priority, query) }
   val snapshot = remember(queue) { queue.snapshot() }
+  val recommendedLimit = remember(queue.size) { recommendedRevisionLimit(queue.size) }
+  val session = remember(queue, recommendedLimit) {
+    if (recommendedLimit == 0) null else RevisionSession(queue, recommendedLimit)
+  }
 
   LazyColumn(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
     item { Text("Revision", style = MaterialTheme.typography.headlineMedium) }
     item { Text(snapshot.stats.summaryText(), style = MaterialTheme.typography.titleMedium) }
     item { Text(snapshot.recommendation, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    session?.let { currentSession ->
+      item {
+        Card(Modifier.fillMaxWidth()) {
+          Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Recommended session", style = MaterialTheme.typography.titleMedium)
+            Text("Revise ${currentSession.questions.size} ${if (currentSession.questions.size == 1) "question" else "questions"} next.")
+            Text(
+              "The highest-priority questions are placed first.",
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+          }
+        }
+      }
+    }
     if (queue.isNotEmpty()) {
       item { OutlinedTextField(query, { query = it }, label = { Text("Search revision queue") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
       item {
