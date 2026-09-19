@@ -25,6 +25,7 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
   val history = tasks.plannerHistory()
   val streak = history.completionStreak(plannerDate())
   val summary = history.historySummary()
+  val consistency = history.consistencyPercent()
 
   LazyColumn(
     modifier = modifier.padding(28.dp),
@@ -41,21 +42,20 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
     if (history.isNotEmpty()) {
       item {
         Card(Modifier.fillMaxWidth()) {
-          Column(
-            Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-          ) {
+          Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Overall progress", style = MaterialTheme.typography.titleMedium)
-            LinearProgressIndicator(
-              progress = { summary.overallPercent / 100f },
-              modifier = Modifier.fillMaxWidth()
-            )
+            LinearProgressIndicator(progress = { summary.overallPercent / 100f }, modifier = Modifier.fillMaxWidth())
             Text("${summary.completedTasks} of ${summary.totalTasks} tasks completed (${summary.overallPercent}%)")
-            Text(
-              "${summary.fullyCompletedDays} of ${summary.plannedDays} planned days fully completed",
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text("${summary.fullyCompletedDays} of ${summary.plannedDays} planned days fully completed", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          }
+        }
+      }
+      item {
+        Card(Modifier.fillMaxWidth()) {
+          Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Consistency", style = MaterialTheme.typography.titleMedium)
+            LinearProgressIndicator(progress = { consistency / 100f }, modifier = Modifier.fillMaxWidth())
+            Text("$consistency% of planned days fully completed")
           }
         }
       }
@@ -64,10 +64,7 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
     if (streak > 0) {
       item {
         Card(Modifier.fillMaxWidth()) {
-          Column(
-            Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-          ) {
+          Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Completion streak", style = MaterialTheme.typography.titleMedium)
             Text("$streak ${if (streak == 1) "day" else "days"} in a row")
           }
@@ -80,15 +77,9 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
     } else {
       items(history, key = { it.date }) { day ->
         Card(Modifier.fillMaxWidth()) {
-          Column(
-            Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-          ) {
+          Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(plannerDisplayDate(day.date), style = MaterialTheme.typography.titleMedium)
-            LinearProgressIndicator(
-              progress = { day.percent / 100f },
-              modifier = Modifier.fillMaxWidth()
-            )
+            LinearProgressIndicator(progress = { day.percent / 100f }, modifier = Modifier.fillMaxWidth())
             Text("${day.completed} of ${day.total} completed (${day.percent}%)")
           }
         }
