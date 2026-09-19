@@ -30,6 +30,10 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
   val consistency = history.consistencyPercent()
   val recentCompletion = history.recentCompletionPercent()
   val recentPerfectDays = history.recentPerfectDayPercent()
+  val recentCompleted = history.recentCompletedTasks()
+  val recentPending = history.recentPendingTasks()
+  val completionRange = history.completionRange()
+  val zeroDays = history.zeroCompletionDays()
   val taskBalance = history.taskBalance()
   val activeSpan = history.activeDaySpan()
   val bestDay = history.bestPlannerDay()
@@ -75,7 +79,9 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
         Card(Modifier.fillMaxWidth()) {
           Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Study planning insights", style = MaterialTheme.typography.titleMedium)
-            Text("Recent completion: $recentCompletion%")
+            Text("Recent completion: $recentCompletion% • $recentCompleted completed • $recentPending pending")
+            Text("Completion range: ${completionRange.lowestPercent}%–${completionRange.highestPercent}%")
+            Text("Zero-completion days: $zeroDays")
             Text("Trend: ${trend.displayText()}")
             Text("Planner history span: $activeSpan ${if (activeSpan == 1L) "day" else "days"}")
             Text("Average plan size: ${String.format(Locale.US, "%.1f", averageTasks)} tasks/day")
