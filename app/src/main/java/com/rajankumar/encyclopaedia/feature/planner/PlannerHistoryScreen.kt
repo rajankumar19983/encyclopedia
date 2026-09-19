@@ -25,9 +25,13 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
   val tasks by dao.observeAllPlannerTasks().collectAsStateWithLifecycle(emptyList())
   val history = tasks.plannerHistory()
   val streak = history.completionStreak(plannerDate())
+  val longestStreak = history.longestCompletionStreak()
   val summary = history.historySummary()
   val consistency = history.consistencyPercent()
   val recentCompletion = history.recentCompletionPercent()
+  val recentPerfectDays = history.recentPerfectDayPercent()
+  val taskBalance = history.taskBalance()
+  val activeSpan = history.activeDaySpan()
   val bestDay = history.bestPlannerDay()
   val busiestDay = history.busiestPlannerDay()
   val averageTasks = history.averageTasksPerPlannedDay()
@@ -52,6 +56,7 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
             LinearProgressIndicator(progress = { summary.overallPercent / 100f }, modifier = Modifier.fillMaxWidth())
             Text("${summary.completedTasks} of ${summary.totalTasks} tasks completed (${summary.overallPercent}%)")
             Text("${summary.fullyCompletedDays} of ${summary.plannedDays} planned days fully completed", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Task balance: ${taskBalance.completed} completed • ${taskBalance.pending} pending")
           }
         }
       }
@@ -61,6 +66,8 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
             Text("Consistency", style = MaterialTheme.typography.titleMedium)
             LinearProgressIndicator(progress = { consistency / 100f }, modifier = Modifier.fillMaxWidth())
             Text("$consistency% of planned days fully completed")
+            Text("Recent perfect days: $recentPerfectDays%")
+            Text("Current streak: $streak ${if (streak == 1) "day" else "days"} • Best streak: $longestStreak ${if (longestStreak == 1) "day" else "days"}")
           }
         }
       }
@@ -70,6 +77,7 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
             Text("Study planning insights", style = MaterialTheme.typography.titleMedium)
             Text("Recent completion: $recentCompletion%")
             Text("Trend: ${trend.displayText()}")
+            Text("Planner history span: $activeSpan ${if (activeSpan == 1L) "day" else "days"}")
             Text("Average plan size: ${String.format(Locale.US, "%.1f", averageTasks)} tasks/day")
             Text("Recent average plan size: ${String.format(Locale.US, "%.1f", recentAverageTasks)} tasks/day")
             Text("Carry-over rate: $carryRate%")
@@ -79,16 +87,6 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
             Text("Oldest pending task: $pendingAge ${if (pendingAge == 1L) "day" else "days"}")
             bestDay?.let { Text("Best day: ${plannerDisplayDate(it.date)} • ${it.completed}/${it.total} completed") }
             busiestDay?.let { Text("Busiest day: ${plannerDisplayDate(it.date)} • ${it.total} tasks planned") }
-          }
-        }
-      }
-    }
-    if (streak > 0) {
-      item {
-        Card(Modifier.fillMaxWidth()) {
-          Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Completion streak", style = MaterialTheme.typography.titleMedium)
-            Text("$streak ${if (streak == 1) "day" else "days"} in a row")
           }
         }
       }
