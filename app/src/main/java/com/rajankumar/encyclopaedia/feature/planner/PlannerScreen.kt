@@ -12,6 +12,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -39,6 +40,7 @@ fun PlannerScreen() {
   val scope = rememberCoroutineScope()
   val today = remember { plannerDate() }
   val tasks by dao.observePlannerTasks(today).collectAsStateWithLifecycle(emptyList())
+  val progress = tasks.plannerProgress()
   var title by remember { mutableStateOf("") }
 
   LaunchedEffect(today) {
@@ -55,6 +57,20 @@ fun PlannerScreen() {
     item {
       Text("Daily Planner", style = MaterialTheme.typography.headlineMedium)
       Text(plannerDisplayDate(today), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    if (progress.total > 0) {
+      item {
+        Card(Modifier.fillMaxWidth()) {
+          Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Today's progress", style = MaterialTheme.typography.titleMedium)
+            LinearProgressIndicator(
+              progress = { progress.percent / 100f },
+              modifier = Modifier.fillMaxWidth()
+            )
+            Text("${progress.completed} of ${progress.total} completed • ${progress.remaining} remaining (${progress.percent}%)")
+          }
+        }
+      }
     }
     item {
       Card(Modifier.fillMaxWidth()) {
