@@ -8,6 +8,7 @@ class TextToSpeechController(context: Context) : TextToSpeech.OnInitListener {
   private val textToSpeech = TextToSpeech(context.applicationContext, this)
   private var ready = false
   private var pendingText: String? = null
+  private var speechRate = SpeechRate.NORMAL
 
   override fun onInit(status: Int) {
     ready = status == TextToSpeech.SUCCESS
@@ -17,10 +18,16 @@ class TextToSpeechController(context: Context) : TextToSpeech.OnInitListener {
     }
 
     textToSpeech.language = Locale.getDefault()
+    textToSpeech.setSpeechRate(speechRate.value)
     pendingText?.let {
       pendingText = null
       speak(it)
     }
+  }
+
+  fun setSpeechRate(rate: SpeechRate) {
+    speechRate = rate
+    if (ready) textToSpeech.setSpeechRate(rate.value)
   }
 
   fun speak(content: SpeakableContent) = speak(content.asSpeechText())
