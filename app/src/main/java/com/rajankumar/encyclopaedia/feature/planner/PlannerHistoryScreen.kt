@@ -24,6 +24,7 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
   val tasks by dao.observeAllPlannerTasks().collectAsStateWithLifecycle(emptyList())
   val history = tasks.plannerHistory()
   val streak = history.completionStreak(plannerDate())
+  val summary = history.historySummary()
 
   LazyColumn(
     modifier = modifier.padding(28.dp),
@@ -35,6 +36,29 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
         "Review how much of each day's study plan you completed.",
         color = MaterialTheme.colorScheme.onSurfaceVariant
       )
+    }
+
+    if (history.isNotEmpty()) {
+      item {
+        Card(Modifier.fillMaxWidth()) {
+          Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+          ) {
+            Text("Overall progress", style = MaterialTheme.typography.titleMedium)
+            LinearProgressIndicator(
+              progress = { summary.overallPercent / 100f },
+              modifier = Modifier.fillMaxWidth()
+            )
+            Text("${summary.completedTasks} of ${summary.totalTasks} tasks completed (${summary.overallPercent}%)")
+            Text(
+              "${summary.fullyCompletedDays} of ${summary.plannedDays} planned days fully completed",
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+          }
+        }
+      }
     }
 
     if (streak > 0) {
