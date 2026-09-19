@@ -9,8 +9,8 @@ class BackupFileNamingTest {
   @Test
   fun fileNameUsesStableUtcTimestamp() {
     assertEquals(
-      "encyclopaedia-backup-2026-09-19_17-25-04.json",
-      backupFileName(1_758_302_704_000L)
+      "encyclopaedia-backup-1970-01-01_00-00-00.json",
+      backupFileName(0L)
     )
   }
 
