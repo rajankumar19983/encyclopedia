@@ -23,6 +23,7 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
   val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
   val tasks by dao.observeAllPlannerTasks().collectAsStateWithLifecycle(emptyList())
   val history = tasks.plannerHistory()
+  val streak = history.completionStreak(plannerDate())
 
   LazyColumn(
     modifier = modifier.padding(28.dp),
@@ -34,6 +35,20 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
         "Review how much of each day's study plan you completed.",
         color = MaterialTheme.colorScheme.onSurfaceVariant
       )
+    }
+
+    if (streak > 0) {
+      item {
+        Card(Modifier.fillMaxWidth()) {
+          Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+          ) {
+            Text("Completion streak", style = MaterialTheme.typography.titleMedium)
+            Text("$streak ${if (streak == 1) "day" else "days"} in a row")
+          }
+        }
+      }
     }
 
     if (history.isEmpty()) {
