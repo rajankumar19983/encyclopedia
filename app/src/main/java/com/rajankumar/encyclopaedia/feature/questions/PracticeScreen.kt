@@ -8,9 +8,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -31,6 +36,9 @@ import androidx.compose.ui.unit.dp
 import com.rajankumar.encyclopaedia.data.local.EncyclopaediaDatabase
 import com.rajankumar.encyclopaedia.data.local.QuestionAttemptEntity
 import com.rajankumar.encyclopaedia.data.local.QuestionEntity
+import com.rajankumar.encyclopaedia.feature.accessibility.asSpeakableExplanation
+import com.rajankumar.encyclopaedia.feature.accessibility.asSpeakableQuestion
+import com.rajankumar.encyclopaedia.feature.accessibility.rememberTextToSpeechController
 import com.rajankumar.encyclopaedia.feature.revision.RevisionPracticeRequest
 import java.util.UUID
 import kotlinx.coroutines.launch
@@ -39,6 +47,7 @@ import kotlinx.coroutines.launch
 fun PracticeScreen(onDone: () -> Unit) {
   val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
   val scope = rememberCoroutineScope()
+  val speech = rememberTextToSpeechController()
   val revisionIds = remember { RevisionPracticeRequest.consume() }
   var config by remember { mutableStateOf<PracticeSessionConfig?>(null) }
   var questions by remember { mutableStateOf<List<QuestionEntity>?>(null) }
@@ -113,6 +122,7 @@ fun PracticeScreen(onDone: () -> Unit) {
       item {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
           Button(onClick = {
+            speech.stop()
             config = PracticeSessionConfig(PracticeMode.MISTAKES, minOf(incorrect.size.coerceAtLeast(5), 20))
             questions = null
             index = 0
@@ -122,10 +132,10 @@ fun PracticeScreen(onDone: () -> Unit) {
             sessionId = newPracticeSessionId()
             scope.launch { questions = dao.loadPracticeQuestions(PracticeMode.MISTAKES, 20) }
           }, enabled = incorrect.isNotEmpty()) { Text("Practise mistakes") }
-          Button(onClick = { config = null; questions = null; index = 0; reviews = emptyList(); sessionId = newPracticeSessionId() }) { Text("New session") }
+          Button(onClick = { speech.stop(); config = null; questions = null; index = 0; reviews = emptyList(); sessionId = newPracticeSessionId() }) { Text("New session") }
         }
       }
-      item { TextButton(onClick = onDone) { Text("Back to Question Bank") } }
+      item { TextButton(onClick = { speech.stop(); onDone() }) { Text("Back to Question Bank") } }
     }
     return
   }
@@ -147,7 +157,19 @@ fun PracticeScreen(onDone: () -> Unit) {
     }
     item { LinearProgressIndicator(progress = { progress.fraction }, modifier = Modifier.fillMaxWidth()) }
     item { Text("Score: ${reviews.count { it.wasCorrect }}", color = MaterialTheme.colorScheme.primary) }
-    item { Text(question.questionText, style = MaterialTheme.typography.titleLarge) }
+    item {
+      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Text(question.questionText, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+        Row {
+          IconButton(onClick = { speech.speak(question.asSpeakableQuestion(options)) }) {
+            Icon(Icons.Default.VolumeUp, "Read question aloud")
+          }
+          IconButton(onClick = speech::stop) {
+            Icon(Icons.Default.Stop, "Stop reading")
+          }
+        }
+      }
+    }
     options.forEachIndexed { optionIndex, option ->
       val letter = optionLetter(optionIndex)
       item(key = "$index-$letter") {
@@ -174,13 +196,23 @@ fun PracticeScreen(onDone: () -> Unit) {
           val correct = selected == correctAnswer
           Text(if (correct) "Correct ✓" else "Incorrect. Correct answer: ${question.answerLabel(correctAnswer)}", color = if (correct) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.titleMedium)
           question.explanation?.takeIf(String::isNotBlank)?.let {
-            Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { Text("Explanation", style = MaterialTheme.typography.titleMedium); Text(it) } }
+            Card(Modifier.fillMaxWidth()) {
+              Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                  Text("Explanation", style = MaterialTheme.typography.titleMedium)
+                  IconButton(onClick = { question.asSpeakableExplanation()?.let(speech::speak) }) {
+                    Icon(Icons.Default.VolumeUp, "Read explanation aloud")
+                  }
+                }
+                Text(it)
+              }
+            }
           }
-          Button(onClick = { index++; selected = null; submitted = false; startedAt = System.currentTimeMillis() }) { Text(if (index == sessionQuestions.lastIndex) "Finish" else "Next Question") }
+          Button(onClick = { speech.stop(); index++; selected = null; submitted = false; startedAt = System.currentTimeMillis() }) { Text(if (index == sessionQuestions.lastIndex) "Finish" else "Next Question") }
         }
       }
     }
-    item { TextButton(onClick = onDone) { Text("End session") } }
+    item { TextButton(onClick = { speech.stop(); onDone() }) { Text("End session") } }
   }
 }
 
