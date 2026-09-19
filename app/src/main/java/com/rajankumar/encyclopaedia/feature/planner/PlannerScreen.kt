@@ -40,6 +40,7 @@ fun PlannerScreen() {
   val scope = rememberCoroutineScope()
   val today = remember { plannerDate() }
   val tasks by dao.observePlannerTasks(today).collectAsStateWithLifecycle(emptyList())
+  val orderedTasks = tasks.orderedForPlanner()
   val progress = tasks.plannerProgress()
   var title by remember { mutableStateOf("") }
 
@@ -104,10 +105,10 @@ fun PlannerScreen() {
         }
       }
     }
-    if (tasks.isEmpty()) {
+    if (orderedTasks.isEmpty()) {
       item { Text("No tasks planned for today yet.") }
     } else {
-      items(tasks, key = { it.id }) { task ->
+      items(orderedTasks, key = { it.id }) { task ->
         Card(Modifier.fillMaxWidth()) {
           Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Checkbox(
