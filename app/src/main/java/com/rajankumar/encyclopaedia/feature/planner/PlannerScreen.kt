@@ -1,0 +1,114 @@
+package com.rajankumar.encyclopaedia.feature.planner
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rajankumar.encyclopaedia.data.local.EncyclopaediaDatabase
+import com.rajankumar.encyclopaedia.data.local.PlannerTaskEntity
+import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+@Composable
+fun PlannerScreen() {
+  val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
+  val today = remember { plannerDate() }
+  val tasks by dao.observePlannerTasks(today).collectAsStateWithLifecycle(emptyList())
+  var title by remember { mutableStateOf("") }
+
+  LaunchedEffect(today) {
+    withContext(Dispatchers.IO) {
+      val overdue = dao.getIncompletePlannerTasksBefore(today)
+      carryIncompleteTasks(overdue, today).forEach { dao.upsertPlannerTask(it) }
+    }
+  }
+
+  LazyColumn(
+    Modifier.fillMaxSize().padding(28.dp),
+    verticalArrangement = Arrangement.spacedBy(14.dp)
+  ) {
+    item {
+      Text("Daily Planner", style = MaterialTheme.typography.headlineMedium)
+      Text(plannerDisplayDate(today), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    item {
+      Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+          Text("Add today's task", style = MaterialTheme.typography.titleMedium)
+          OutlinedTextField(
+            value = title,
+            onValueChange = { title = it },
+            label = { Text("Study task") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+          )
+          Button(
+            enabled = title.isNotBlank(),
+            onClick = {
+              val cleanTitle = title.trim()
+              title = ""
+              kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                dao.upsertPlannerTask(
+                  PlannerTaskEntity(
+                    id = UUID.randomUUID().toString(),
+                    title = cleanTitle,
+                    scheduledDate = today
+                  )
+                )
+              }
+            }
+          ) { Text("Add task") }
+        }
+      }
+    }
+    if (tasks.isEmpty()) {
+      item { Text("No tasks planned for today yet.") }
+    } else {
+      items(tasks, key = { it.id }) { task ->
+        Card(Modifier.fillMaxWidth()) {
+          Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Checkbox(
+              checked = task.isCompleted,
+              onCheckedChange = { completed ->
+                kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                  dao.setPlannerTaskCompleted(task.id, completed, if (completed) System.currentTimeMillis() else null)
+                }
+              }
+            )
+            Column(Modifier.weight(1f)) {
+              Text(task.title, style = MaterialTheme.typography.titleMedium)
+              task.carriedFromDate?.let {
+                Text("Carried from ${plannerDisplayDate(it)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+              }
+            }
+            IconButton(onClick = {
+              kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch { dao.deletePlannerTask(task.id) }
+            }) { Text("×") }
+          }
+        }
+      }
+    }
+  }
+}
