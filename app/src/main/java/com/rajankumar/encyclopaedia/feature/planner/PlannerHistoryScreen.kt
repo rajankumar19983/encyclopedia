@@ -31,11 +31,13 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
   val bestDay = history.bestPlannerDay()
   val busiestDay = history.busiestPlannerDay()
   val averageTasks = history.averageTasksPerPlannedDay()
+  val recentAverageTasks = history.recentAveragePlanSize()
   val trend = history.completionTrend()
   val carryRate = tasks.carryOverRatePercent()
   val pendingAge = tasks.oldestPendingAgeDays(plannerDate())
   val pendingLoad = tasks.pendingLoad()
   val carriedRecovery = tasks.carriedCompletionPercent()
+  val backlogPressure = tasks.backlogPressurePercent()
 
   LazyColumn(modifier = modifier.padding(28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
     item {
@@ -69,8 +71,10 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
             Text("Recent completion: $recentCompletion%")
             Text("Trend: ${trend.displayText()}")
             Text("Average plan size: ${String.format(Locale.US, "%.1f", averageTasks)} tasks/day")
+            Text("Recent average plan size: ${String.format(Locale.US, "%.1f", recentAverageTasks)} tasks/day")
             Text("Carry-over rate: $carryRate%")
             Text("Carried-task recovery: $carriedRecovery%")
+            Text("Backlog pressure: $backlogPressure% of pending work is carried")
             Text("Pending workload: ${pendingLoad.totalPending} (${pendingLoad.carriedPending} carried, ${pendingLoad.newPending} new)")
             Text("Oldest pending task: $pendingAge ${if (pendingAge == 1L) "day" else "days"}")
             bestDay?.let { Text("Best day: ${plannerDisplayDate(it.date)} • ${it.completed}/${it.total} completed") }
