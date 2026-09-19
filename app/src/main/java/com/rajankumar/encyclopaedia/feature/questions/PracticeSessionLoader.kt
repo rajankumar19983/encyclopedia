@@ -12,3 +12,9 @@ suspend fun EncyclopaediaDao.loadPracticeQuestions(mode: PracticeMode, limit: In
   }
   return candidates.filter { it.validateForPractice().valid }.take(requested)
 }
+
+suspend fun EncyclopaediaDao.loadRevisionPracticeQuestions(questionIds: List<String>): List<QuestionEntity> {
+  if (questionIds.isEmpty()) return emptyList()
+  val byId = getQuestionsByIds(questionIds).associateBy { it.id }
+  return questionIds.mapNotNull(byId::get).filter { it.validateForPractice().valid }
+}
