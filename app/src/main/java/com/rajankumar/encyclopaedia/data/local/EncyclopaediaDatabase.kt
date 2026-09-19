@@ -11,9 +11,10 @@ import androidx.room.RoomDatabase
     LessonEntity::class,
     QuestionEntity::class,
     QuestionTopicEntity::class,
-    QuestionAttemptEntity::class
+    QuestionAttemptEntity::class,
+    PlannerTaskEntity::class
   ],
-  version = 2,
+  version = 3,
   exportSchema = false
 )
 abstract class EncyclopaediaDatabase : RoomDatabase() {

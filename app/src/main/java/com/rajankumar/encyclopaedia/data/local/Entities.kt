@@ -81,3 +81,18 @@ data class QuestionAttemptEntity(
   val timeTakenMs: Long,
   val attemptedAt: Long = System.currentTimeMillis()
 )
+
+@Entity(
+  tableName = "planner_tasks",
+  indices = [Index("scheduledDate"), Index("isCompleted"), Index("createdAt")]
+)
+data class PlannerTaskEntity(
+  @PrimaryKey val id: String,
+  val title: String,
+  val scheduledDate: String,
+  val isCompleted: Boolean = false,
+  val completedAt: Long? = null,
+  val carriedFromDate: String? = null,
+  val createdAt: Long = System.currentTimeMillis(),
+  val updatedAt: Long = System.currentTimeMillis()
+)
