@@ -56,7 +56,9 @@ private fun EncyclopaediaNavHost(navController: NavHostController) {
     composable(AppDestination.Learn.route) { KnowledgeScreen() }
     composable(AppDestination.Questions.route) { QuestionBankScreen() }
     composable(AppDestination.Practice.route) { PracticeScreen(onDone = { navigateSingleTop(navController, AppDestination.Questions.route) }) }
-    composable(AppDestination.Revision.route) { RevisionScreen() }
+    composable(AppDestination.Revision.route) {
+      RevisionScreen(onStartPractice = { navigateSingleTop(navController, AppDestination.Practice.route) })
+    }
     composable(AppDestination.Planner.route) { FeaturePlaceholderScreen("Daily Planner", "Plan learning, revision, practice and PYQ work for each day.") }
     composable(AppDestination.Pyq.route) { FeaturePlaceholderScreen("PYQ Papers", "Organize official previous-year questions by exam, year, paper and shift.") }
     composable(AppDestination.Performance.route) { PerformanceScreen() }
