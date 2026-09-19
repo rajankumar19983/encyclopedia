@@ -79,15 +79,16 @@ fun PlannerScreen() {
           Text("Add today's task", style = MaterialTheme.typography.titleMedium)
           OutlinedTextField(
             value = title,
-            onValueChange = { title = it },
+            onValueChange = { title = it.take(160) },
             label = { Text("Study task") },
+            supportingText = { Text("${title.length}/160") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
           )
           Button(
-            enabled = title.isNotBlank(),
+            enabled = isValidPlannerTaskTitle(title),
             onClick = {
-              val cleanTitle = title.trim()
+              val cleanTitle = normalizePlannerTaskTitle(title)
               title = ""
               scope.launch(Dispatchers.IO) {
                 dao.upsertPlannerTask(
