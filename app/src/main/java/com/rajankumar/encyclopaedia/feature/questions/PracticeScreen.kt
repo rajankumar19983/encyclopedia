@@ -17,6 +17,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.rajankumar.encyclopaedia.data.local.EncyclopaediaDatabase
 import com.rajankumar.encyclopaedia.data.local.QuestionAttemptEntity
 import com.rajankumar.encyclopaedia.data.local.QuestionEntity
+import com.rajankumar.encyclopaedia.feature.revision.RevisionPracticeRequest
 import java.util.UUID
 import kotlinx.coroutines.launch
 
@@ -37,6 +39,7 @@ import kotlinx.coroutines.launch
 fun PracticeScreen(onDone: () -> Unit) {
   val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
   val scope = rememberCoroutineScope()
+  val revisionIds = remember { RevisionPracticeRequest.consume() }
   var config by remember { mutableStateOf<PracticeSessionConfig?>(null) }
   var questions by remember { mutableStateOf<List<QuestionEntity>?>(null) }
   var sessionId by remember { mutableStateOf(newPracticeSessionId()) }
@@ -46,7 +49,14 @@ fun PracticeScreen(onDone: () -> Unit) {
   var startedAt by remember { mutableLongStateOf(System.currentTimeMillis()) }
   var reviews by remember { mutableStateOf<List<PracticeAnswerReview>>(emptyList()) }
 
-  if (config == null) {
+  LaunchedEffect(revisionIds) {
+    if (revisionIds.isNotEmpty()) {
+      config = PracticeSessionConfig(PracticeMode.MISTAKES, revisionIds.size)
+      questions = dao.loadRevisionPracticeQuestions(revisionIds)
+    }
+  }
+
+  if (config == null && revisionIds.isEmpty()) {
     PracticeSetup(
       onStart = { chosen ->
         config = chosen
@@ -62,7 +72,7 @@ fun PracticeScreen(onDone: () -> Unit) {
   if (sessionQuestions == null) {
     Column(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
       Text("Practice", style = MaterialTheme.typography.headlineMedium)
-      Text("Preparing ${config!!.mode.label.lowercase()} practice…")
+      Text(if (revisionIds.isNotEmpty()) "Preparing revision practice…" else "Preparing ${config?.mode?.label?.lowercase() ?: ""} practice…")
       LinearProgressIndicator(Modifier.fillMaxWidth())
     }
     return
@@ -71,7 +81,7 @@ fun PracticeScreen(onDone: () -> Unit) {
   if (sessionQuestions.isEmpty()) {
     Column(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
       Text("Practice", style = MaterialTheme.typography.headlineMedium)
-      Text(config!!.mode.emptyMessage())
+      Text(if (revisionIds.isNotEmpty()) "No valid revision questions are available." else config!!.mode.emptyMessage())
       Button(onClick = { config = null; questions = null }) { Text("Choose another mode") }
       TextButton(onClick = onDone) { Text("Back to Question Bank") }
     }
@@ -129,8 +139,8 @@ fun PracticeScreen(onDone: () -> Unit) {
     item {
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Column {
-          Text("Practice", style = MaterialTheme.typography.headlineMedium)
-          Text(config!!.mode.label, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          Text(if (revisionIds.isNotEmpty()) "Revision Practice" else "Practice", style = MaterialTheme.typography.headlineMedium)
+          Text(if (revisionIds.isNotEmpty()) "Recommended revision" else config!!.mode.label, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(progress.label)
       }
@@ -157,9 +167,7 @@ fun PracticeScreen(onDone: () -> Unit) {
           val timeTaken = elapsedAnswerTime(startedAt)
           reviews = reviews + PracticeAnswerReview(question, answer, evaluation.isCorrect, timeTaken)
           submitted = true
-          scope.launch {
-            dao.insertAttempt(QuestionAttemptEntity(UUID.randomUUID().toString(), question.id, sessionId, evaluation.selected, evaluation.isCorrect, timeTaken))
-          }
+          scope.launch { dao.insertAttempt(QuestionAttemptEntity(UUID.randomUUID().toString(), question.id, sessionId, evaluation.selected, evaluation.isCorrect, timeTaken)) }
         }, enabled = selected != null) { Text("Check Answer") }
       } else {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
