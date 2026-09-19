@@ -57,6 +57,7 @@ fun PlannerScreen() {
     item {
       Text("Daily Planner", style = MaterialTheme.typography.headlineMedium)
       Text(plannerDisplayDate(today), color = MaterialTheme.colorScheme.onSurfaceVariant)
+      Text(progress.summaryText(), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 6.dp))
     }
     if (progress.total > 0) {
       item {
