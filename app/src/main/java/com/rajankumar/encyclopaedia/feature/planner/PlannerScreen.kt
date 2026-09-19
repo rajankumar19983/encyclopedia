@@ -43,6 +43,7 @@ fun PlannerScreen() {
   val orderedTasks = tasks.orderedForPlanner()
   val progress = tasks.plannerProgress()
   val carryOver = tasks.carryOverSummary()
+  val stats = tasks.completionStats()
   var title by remember { mutableStateOf("") }
 
   LaunchedEffect(today) {
@@ -84,6 +85,11 @@ fun PlannerScreen() {
               modifier = Modifier.fillMaxWidth()
             )
             Text("${progress.completed} of ${progress.total} completed • ${progress.remaining} remaining (${progress.percent}%)")
+            Text(
+              "Completed ${stats.completedToday} • Carried pending ${stats.carriedPending} • New pending ${stats.newlyPlannedPending}",
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
           }
         }
       }
