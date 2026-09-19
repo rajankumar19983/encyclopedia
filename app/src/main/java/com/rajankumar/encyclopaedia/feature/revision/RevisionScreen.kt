@@ -35,13 +35,16 @@ fun RevisionScreen() {
   val visible = remember(queue, query, priority) { queue.filterRevisionQueue(priority, query) }
   val snapshot = remember(queue) { queue.snapshot() }
   val recommendedLimit = remember(queue.size) { recommendedRevisionLimit(queue.size) }
-  val session = remember(queue, recommendedLimit) {
-    if (recommendedLimit == 0) null else RevisionSession(queue, recommendedLimit)
-  }
+  val session = remember(queue, recommendedLimit) { if (recommendedLimit == 0) null else RevisionSession(queue, recommendedLimit) }
 
   LazyColumn(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
     item { Text("Revision", style = MaterialTheme.typography.headlineMedium) }
-    item { Text(snapshot.stats.summaryText(), style = MaterialTheme.typography.titleMedium) }
+    item {
+      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(snapshot.stats.summaryText(), style = MaterialTheme.typography.titleMedium)
+        Text(snapshot.health.label, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+      }
+    }
     item { Text(snapshot.recommendation, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     session?.let { currentSession ->
       item {
@@ -49,11 +52,7 @@ fun RevisionScreen() {
           Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Recommended session", style = MaterialTheme.typography.titleMedium)
             Text("Revise ${currentSession.questions.size} ${if (currentSession.questions.size == 1) "question" else "questions"} next.")
-            Text(
-              "The highest-priority questions are placed first.",
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text("The highest-priority questions are placed first.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
           }
         }
       }
