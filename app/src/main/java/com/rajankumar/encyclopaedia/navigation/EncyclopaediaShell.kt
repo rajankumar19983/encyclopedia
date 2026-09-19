@@ -24,6 +24,7 @@ import com.rajankumar.encyclopaedia.feature.common.FeaturePlaceholderScreen
 import com.rajankumar.encyclopaedia.feature.home.HomeScreen
 import com.rajankumar.encyclopaedia.feature.knowledge.KnowledgeScreen
 import com.rajankumar.encyclopaedia.feature.performance.PerformanceScreen
+import com.rajankumar.encyclopaedia.feature.planner.PlannerScreen
 import com.rajankumar.encyclopaedia.feature.questions.PracticeScreen
 import com.rajankumar.encyclopaedia.feature.questions.QuestionBankScreen
 import com.rajankumar.encyclopaedia.feature.revision.RevisionScreen
@@ -59,7 +60,7 @@ private fun EncyclopaediaNavHost(navController: NavHostController) {
     composable(AppDestination.Revision.route) {
       RevisionScreen(onStartPractice = { navigateSingleTop(navController, AppDestination.Practice.route) })
     }
-    composable(AppDestination.Planner.route) { FeaturePlaceholderScreen("Daily Planner", "Plan learning, revision, practice and PYQ work for each day.") }
+    composable(AppDestination.Planner.route) { PlannerScreen() }
     composable(AppDestination.Pyq.route) { FeaturePlaceholderScreen("PYQ Papers", "Organize official previous-year questions by exam, year, paper and shift.") }
     composable(AppDestination.Performance.route) { PerformanceScreen() }
     composable(AppDestination.Backup.route) { FeaturePlaceholderScreen("Backup & Restore", "Export and safely restore your complete local Encyclopaedia data.") }
