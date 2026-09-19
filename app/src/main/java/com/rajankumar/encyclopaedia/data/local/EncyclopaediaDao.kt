@@ -51,6 +51,9 @@ interface EncyclopaediaDao {
   @Query("SELECT * FROM questions ORDER BY RANDOM() LIMIT :limit")
   suspend fun getRandomQuestions(limit: Int): List<QuestionEntity>
 
+  @Query("SELECT * FROM questions WHERE id IN (:ids)")
+  suspend fun getQuestionsByIds(ids: List<String>): List<QuestionEntity>
+
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   suspend fun upsertQuestion(question: QuestionEntity)
 
@@ -118,17 +121,11 @@ interface EncyclopaediaDao {
   @Transaction
   suspend fun saveImportedQuestionIfUnique(question: QuestionEntity, topicId: String?): Boolean {
     val incomingQuestion = importFingerprint(question.questionText)
-    val incomingOptions = question.options.lines().map(::importFingerprint).filter { it.isNotBlank() }
-    val duplicate = getAllQuestionsOnce().any { existing ->
-      importFingerprint(existing.questionText) == incomingQuestion &&
-        existing.options.lines().map(::importFingerprint).filter { it.isNotBlank() } == incomingOptions
-    }
+    val duplicate = getAllQuestionsOnce().any { importFingerprint(it.questionText) == incomingQuestion }
     if (duplicate) return false
     saveQuestion(question, topicId)
     return true
   }
 }
 
-private fun importFingerprint(value: String): String = value
-  .lowercase()
-  .replace(Regex("[^\\p{L}\\p{N}]+"), "")
+private fun importFingerprint(value: String): String = value.trim().lowercase().replace(Regex("\\s+"), " ")
