@@ -32,7 +32,8 @@ fun RevisionScreen() {
   val queue = remember(questions, attempts) { buildRevisionQueue(questions, attempts) }
   var query by remember { mutableStateOf("") }
   var priority by remember { mutableStateOf<RevisionPriority?>(null) }
-  val visible = remember(queue, query, priority) { queue.filterRevisionQueue(priority, query) }
+  var sort by remember { mutableStateOf(RevisionSort.PRIORITY) }
+  val visible = remember(queue, query, priority, sort) { queue.filterRevisionQueue(priority, query).sortedForRevision(sort) }
   val snapshot = remember(queue) { queue.snapshot() }
   val badge = remember(queue) { queue.revisionBadge() }
   val recommendedLimit = remember(queue.size) { recommendedRevisionLimit(queue.size) }
@@ -42,13 +43,7 @@ fun RevisionScreen() {
     item {
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text("Revision", style = MaterialTheme.typography.headlineMedium)
-        if (badge.count > 0) {
-          Text(
-            if (badge.hasUrgent) "${badge.count} due • urgent" else "${badge.count} due",
-            color = MaterialTheme.colorScheme.primary,
-            style = MaterialTheme.typography.labelLarge
-          )
-        }
+        if (badge.count > 0) Text(if (badge.hasUrgent) "${badge.count} due • urgent" else "${badge.count} due", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
       }
     }
     item {
@@ -77,6 +72,13 @@ fun RevisionScreen() {
           RevisionPriority.entries.forEach { option -> FilterChip(selected = priority == option, onClick = { priority = option }, label = { Text(option.label) }) }
         }
       }
+      item {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          RevisionSort.entries.forEach { option ->
+            FilterChip(selected = sort == option, onClick = { sort = option }, label = { Text(option.label()) })
+          }
+        }
+      }
     }
     if (queue.isEmpty()) item { Text(revisionEmptyMessage) }
     else if (visible.isEmpty()) item { Text("No revision questions match this filter.") }
@@ -94,4 +96,10 @@ fun RevisionScreen() {
       }
     }
   }
+}
+
+private fun RevisionSort.label(): String = when (this) {
+  RevisionSort.PRIORITY -> "Priority"
+  RevisionSort.MOST_MISTAKES -> "Mistakes"
+  RevisionSort.MOST_ATTEMPTED -> "Attempts"
 }
