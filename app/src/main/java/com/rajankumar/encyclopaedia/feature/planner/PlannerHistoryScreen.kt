@@ -31,16 +31,13 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
   val bestDay = history.bestPlannerDay()
   val busiestDay = history.busiestPlannerDay()
   val averageTasks = history.averageTasksPerPlannedDay()
+  val trend = history.completionTrend()
 
-  LazyColumn(
-    modifier = modifier.padding(28.dp),
-    verticalArrangement = Arrangement.spacedBy(12.dp)
-  ) {
+  LazyColumn(modifier = modifier.padding(28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
     item {
       Text("Planner history", style = MaterialTheme.typography.headlineMedium)
       Text("Review how much of each day's study plan you completed.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-
     if (history.isNotEmpty()) {
       item {
         Card(Modifier.fillMaxWidth()) {
@@ -66,6 +63,7 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
           Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Study planning insights", style = MaterialTheme.typography.titleMedium)
             Text("Recent completion: $recentCompletion%")
+            Text("Trend: ${trend.displayText()}")
             Text("Average plan size: ${String.format(Locale.US, "%.1f", averageTasks)} tasks/day")
             bestDay?.let { Text("Best day: ${plannerDisplayDate(it.date)} • ${it.completed}/${it.total} completed") }
             busiestDay?.let { Text("Busiest day: ${plannerDisplayDate(it.date)} • ${it.total} tasks planned") }
@@ -73,7 +71,6 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
         }
       }
     }
-
     if (streak > 0) {
       item {
         Card(Modifier.fillMaxWidth()) {
@@ -84,17 +81,13 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
         }
       }
     }
-
-    if (history.isEmpty()) {
-      item { Text("No planner history yet.") }
-    } else {
-      items(history, key = { it.date }) { day ->
-        Card(Modifier.fillMaxWidth()) {
-          Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(plannerDisplayDate(day.date), style = MaterialTheme.typography.titleMedium)
-            LinearProgressIndicator(progress = { day.percent / 100f }, modifier = Modifier.fillMaxWidth())
-            Text("${day.completed} of ${day.total} completed (${day.percent}%)")
-          }
+    if (history.isEmpty()) item { Text("No planner history yet.") }
+    else items(history, key = { it.date }) { day ->
+      Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+          Text(plannerDisplayDate(day.date), style = MaterialTheme.typography.titleMedium)
+          LinearProgressIndicator(progress = { day.percent / 100f }, modifier = Modifier.fillMaxWidth())
+          Text("${day.completed} of ${day.total} completed (${day.percent}%)")
         }
       }
     }
