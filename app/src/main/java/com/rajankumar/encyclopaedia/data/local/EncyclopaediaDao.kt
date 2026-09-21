@@ -19,12 +19,10 @@ interface EncyclopaediaDao {
   @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertNode(node: KnowledgeNodeEntity)
   @Update suspend fun updateNode(node: KnowledgeNodeEntity)
   @Query("UPDATE knowledge_nodes SET isArchived = 1, updatedAt = :now WHERE id = :id") suspend fun archiveNode(id: String, now: Long = System.currentTimeMillis())
-
   @Query("SELECT * FROM lessons WHERE knowledgeNodeId = :nodeId AND isArchived = 0 ORDER BY sortOrder, title") fun observeLessons(nodeId: String): Flow<List<LessonEntity>>
   @Query("SELECT * FROM lessons ORDER BY createdAt") suspend fun getAllLessonsForBackup(): List<LessonEntity>
   @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertLesson(lesson: LessonEntity)
   @Query("UPDATE lessons SET isArchived = 1, updatedAt = :now WHERE id = :id") suspend fun archiveLesson(id: String, now: Long = System.currentTimeMillis())
-
   @Query("SELECT * FROM questions ORDER BY createdAt DESC") fun observeQuestions(): Flow<List<QuestionEntity>>
   @Query("SELECT COUNT(*) FROM questions") fun observeQuestionCount(): Flow<Int>
   @Query("SELECT * FROM questions") suspend fun getAllQuestionsOnce(): List<QuestionEntity>
@@ -35,7 +33,6 @@ interface EncyclopaediaDao {
   @Query("SELECT * FROM question_topics ORDER BY questionId, knowledgeNodeId") suspend fun getAllQuestionTopicsForBackup(): List<QuestionTopicEntity>
   @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertQuestionTopic(link: QuestionTopicEntity)
   @Query("DELETE FROM question_topics WHERE questionId = :questionId") suspend fun clearQuestionTopics(questionId: String)
-
   @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertAttempt(attempt: QuestionAttemptEntity)
   @Query("SELECT * FROM question_attempts WHERE questionId = :questionId ORDER BY attemptedAt DESC") fun observeAttemptsForQuestion(questionId: String): Flow<List<QuestionAttemptEntity>>
   @Query("SELECT COUNT(*) FROM question_attempts") fun observeAttemptCount(): Flow<Int>
@@ -51,7 +48,6 @@ interface EncyclopaediaDao {
   @Query("SELECT * FROM questions WHERE id NOT IN (SELECT DISTINCT questionId FROM question_attempts) ORDER BY RANDOM() LIMIT :limit") suspend fun getUnattemptedQuestions(limit: Int): List<QuestionEntity>
   @Query("SELECT COUNT(*) FROM question_attempts WHERE questionId = :questionId") suspend fun getAttemptCountForQuestion(questionId: String): Int
   @Query("SELECT COUNT(*) FROM question_attempts WHERE questionId = :questionId AND isCorrect = 1") suspend fun getCorrectCountForQuestion(questionId: String): Int
-
   @Query("SELECT * FROM planner_tasks WHERE scheduledDate = :date ORDER BY isCompleted, createdAt") fun observePlannerTasks(date: String): Flow<List<PlannerTaskEntity>>
   @Query("SELECT * FROM planner_tasks ORDER BY scheduledDate DESC, createdAt") fun observeAllPlannerTasks(): Flow<List<PlannerTaskEntity>>
   @Query("SELECT * FROM planner_tasks ORDER BY scheduledDate, createdAt") suspend fun getAllPlannerTasksForBackup(): List<PlannerTaskEntity>
@@ -60,7 +56,6 @@ interface EncyclopaediaDao {
   @Query("UPDATE planner_tasks SET title = :title, updatedAt = :now WHERE id = :id") suspend fun updatePlannerTaskTitle(id: String, title: String, now: Long = System.currentTimeMillis())
   @Query("UPDATE planner_tasks SET isCompleted = :completed, completedAt = :completedAt, updatedAt = :now WHERE id = :id") suspend fun setPlannerTaskCompleted(id: String, completed: Boolean, completedAt: Long?, now: Long = System.currentTimeMillis())
   @Query("DELETE FROM planner_tasks WHERE id = :id") suspend fun deletePlannerTask(id: String)
-
   @Query("SELECT * FROM notebook_pages ORDER BY sortOrder, updatedAt DESC") fun observeNotebookPages(): Flow<List<NotebookPageEntity>>
   @Query("SELECT * FROM notebook_pages ORDER BY sortOrder, createdAt") suspend fun getAllNotebookPagesForBackup(): List<NotebookPageEntity>
   @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertNotebookPage(page: NotebookPageEntity)
@@ -76,7 +71,6 @@ interface EncyclopaediaDao {
   @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertNotebookStroke(stroke: NotebookStrokeEntity)
   @Query("DELETE FROM notebook_strokes WHERE id = :id") suspend fun deleteNotebookStroke(id: String)
   @Query("DELETE FROM notebook_strokes WHERE layerId = :layerId") suspend fun clearNotebookLayer(layerId: String)
-
   @Query("DELETE FROM question_attempts") suspend fun deleteAllAttemptsForRestore()
   @Query("DELETE FROM question_topics") suspend fun deleteAllQuestionTopicsForRestore()
   @Query("DELETE FROM questions") suspend fun deleteAllQuestionsForRestore()
@@ -87,26 +81,12 @@ interface EncyclopaediaDao {
   @Query("DELETE FROM notebook_layers") suspend fun deleteAllNotebookLayersForRestore()
   @Query("DELETE FROM notebook_pages") suspend fun deleteAllNotebookPagesForRestore()
 
-  @Transaction
-  suspend fun restoreSnapshot(snapshot: BackupSnapshot) {
-    require(snapshot.isInternallyConsistent()) { "Backup snapshot is internally inconsistent" }
-    deleteAllAttemptsForRestore(); deleteAllQuestionTopicsForRestore(); deleteAllQuestionsForRestore(); deleteAllLessonsForRestore(); deleteAllNodesForRestore(); deleteAllPlannerTasksForRestore()
-    snapshot.knowledgeNodes.forEach { upsertNode(it) }; snapshot.lessons.forEach { upsertLesson(it) }; snapshot.questions.forEach { upsertQuestion(it) }; snapshot.questionTopics.forEach { upsertQuestionTopic(it) }; snapshot.attempts.forEach { insertAttempt(it) }; snapshot.plannerTasks.forEach { upsertPlannerTask(it) }
+  @Transaction suspend fun restoreSnapshot(snapshot: BackupSnapshot) {
+    require(snapshot.isInternallyConsistent())
+    deleteAllNotebookStrokesForRestore(); deleteAllNotebookLayersForRestore(); deleteAllNotebookPagesForRestore(); deleteAllAttemptsForRestore(); deleteAllQuestionTopicsForRestore(); deleteAllQuestionsForRestore(); deleteAllLessonsForRestore(); deleteAllNodesForRestore(); deleteAllPlannerTasksForRestore()
+    snapshot.knowledgeNodes.forEach { upsertNode(it) }; snapshot.lessons.forEach { upsertLesson(it) }; snapshot.questions.forEach { upsertQuestion(it) }; snapshot.questionTopics.forEach { upsertQuestionTopic(it) }; snapshot.attempts.forEach { insertAttempt(it) }; snapshot.plannerTasks.forEach { upsertPlannerTask(it) }; snapshot.notebookPages.forEach { upsertNotebookPage(it) }; snapshot.notebookLayers.forEach { upsertNotebookLayer(it) }; snapshot.notebookStrokes.forEach { upsertNotebookStroke(it) }
   }
-
-  @Transaction
-  suspend fun saveQuestion(question: QuestionEntity, topicId: String?) {
-    upsertQuestion(question); clearQuestionTopics(question.id); if (topicId != null) upsertQuestionTopic(QuestionTopicEntity(question.id, topicId))
-  }
-
-  @Transaction
-  suspend fun saveImportedQuestionIfUnique(question: QuestionEntity, topicId: String?): Boolean {
-    val incomingQuestion = importFingerprint(question.questionText)
-    val incomingOptions = question.options.lines().map(::importFingerprint).filter { it.isNotBlank() }
-    val duplicate = getAllQuestionsOnce().any { existing -> importFingerprint(existing.questionText) == incomingQuestion && existing.options.lines().map(::importFingerprint).filter { it.isNotBlank() } == incomingOptions }
-    if (duplicate) return false
-    saveQuestion(question, topicId); return true
-  }
+  @Transaction suspend fun saveQuestion(question: QuestionEntity, topicId: String?) { upsertQuestion(question); clearQuestionTopics(question.id); if (topicId != null) upsertQuestionTopic(QuestionTopicEntity(question.id, topicId)) }
+  @Transaction suspend fun saveImportedQuestionIfUnique(question: QuestionEntity, topicId: String?): Boolean { val q=importFingerprint(question.questionText); val opts=question.options.lines().map(::importFingerprint).filter{it.isNotBlank()}; if(getAllQuestionsOnce().any{importFingerprint(it.questionText)==q && it.options.lines().map(::importFingerprint).filter{x->x.isNotBlank()}==opts}) return false; saveQuestion(question,topicId); return true }
 }
-
-private fun importFingerprint(value: String): String = value.lowercase().replace(Regex("[^\\p{L}\\p{N}]+"), "")
+private fun importFingerprint(value:String)=value.lowercase().replace(Regex("[^\\p{L}\\p{N}]+"),"")
