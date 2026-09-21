@@ -31,9 +31,15 @@ fun BackupSettingsSection() {
   val manager = remember(store) { DeviceBackupManager(store) }
   var configured by remember { mutableStateOf(store.configuredDirectory() != null) }
   var busy by remember { mutableStateOf(false) }
-  var status by remember { mutableStateOf(if (configured) "Backup folder configured." else "Choose a local or cloud folder to enable backups.") }
+  var status by remember {
+    mutableStateOf(
+      if (configured) "Backup folder configured."
+      else "Reinstalled the app? Choose your previous backup folder to find existing restore points."
+    )
+  }
   var restorePoints by remember { mutableStateOf(runCatching { manager.discoverRestorePoints() }.getOrDefault(emptyList())) }
   var pendingRestore by remember { mutableStateOf<BackupRestorePoint?>(null) }
+  var discoveredAfterReconnect by remember { mutableStateOf<List<BackupRestorePoint>>(emptyList()) }
 
   val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
     if (uri != null) runCatching { store.setDirectory(uri) }
@@ -41,19 +47,25 @@ fun BackupSettingsSection() {
         configured = true
         AutomaticBackupScheduler.schedule(context)
         restorePoints = runCatching { manager.discoverRestorePoints() }.getOrDefault(emptyList())
-        status = "Backup location saved. Automatic backup runs daily around midnight."
+        val valid = restorePoints.filter { it.valid }.take(MAX_RESTORE_POINTS)
+        if (valid.isNotEmpty()) {
+          discoveredAfterReconnect = valid
+          status = "Found ${valid.size} existing backup${if (valid.size == 1) "" else "s"} in this location."
+        } else {
+          status = "Backup location saved. No existing restore points were found. Automatic backup runs daily around midnight."
+        }
       }.onFailure { status = it.message ?: "Could not use that backup location." }
   }
 
   Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
     Text("Backup & restore", style = MaterialTheme.typography.titleLarge)
     Text(
-      "Choose any folder Android makes available, including device storage or a cloud provider such as Google Drive. The app keeps up to five validated restore points and never receives your cloud password.",
+      "Choose any folder Android makes available, including device storage or a cloud provider such as Google Drive. After reinstalling, choose the same folder and Encyclopaedia will discover its backups automatically.",
       color = MaterialTheme.colorScheme.onSurfaceVariant
     )
     Text(status, color = MaterialTheme.colorScheme.onSurfaceVariant)
     OutlinedButton(onClick = { folderPicker.launch(store.configuredDirectory()) }) {
-      Text(if (configured) "Change backup location" else "Choose backup location")
+      Text(if (configured) "Change backup location" else "Choose or reconnect backup location")
     }
     Button(enabled = configured && !busy, onClick = {
       busy = true
@@ -78,6 +90,26 @@ fun BackupSettingsSection() {
         if (point.valid) OutlinedButton(enabled = !busy, onClick = { pendingRestore = point }) { Text("Restore this backup") }
       }
     }
+  }
+
+  if (discoveredAfterReconnect.isNotEmpty()) {
+    val newest = discoveredAfterReconnect.first()
+    AlertDialog(
+      onDismissRequest = { discoveredAfterReconnect = emptyList() },
+      title = { Text("Existing backups found") },
+      text = {
+        Text("Found ${discoveredAfterReconnect.size} valid restore point${if (discoveredAfterReconnect.size == 1) "" else "s"}. The newest is ${newest.name}. You can restore it now or choose another version from the list.")
+      },
+      confirmButton = {
+        TextButton(onClick = {
+          discoveredAfterReconnect = emptyList()
+          pendingRestore = newest
+        }) { Text("Restore newest") }
+      },
+      dismissButton = {
+        TextButton(onClick = { discoveredAfterReconnect = emptyList() }) { Text("Choose another") }
+      }
+    )
   }
 
   pendingRestore?.let { point ->
