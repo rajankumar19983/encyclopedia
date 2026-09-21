@@ -40,6 +40,8 @@ import com.rajankumar.encyclopaedia.feature.accessibility.asSpeakableExplanation
 import com.rajankumar.encyclopaedia.feature.accessibility.asSpeakableQuestion
 import com.rajankumar.encyclopaedia.feature.accessibility.rememberTextToSpeechController
 import com.rajankumar.encyclopaedia.feature.revision.RevisionPracticeRequest
+import com.rajankumar.encyclopaedia.feature.teacher.PublishTeacherContext
+import com.rajankumar.encyclopaedia.feature.teacher.asTeacherContext
 import java.util.UUID
 import kotlinx.coroutines.launch
 
@@ -66,6 +68,7 @@ fun PracticeScreen(onDone: () -> Unit) {
   }
 
   if (config == null && revisionIds.isEmpty()) {
+    PublishTeacherContext(null)
     PracticeSetup(
       onStart = { chosen ->
         config = chosen
@@ -79,6 +82,7 @@ fun PracticeScreen(onDone: () -> Unit) {
 
   val sessionQuestions = questions
   if (sessionQuestions == null) {
+    PublishTeacherContext(null)
     Column(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
       Text("Practice", style = MaterialTheme.typography.headlineMedium)
       Text(if (revisionIds.isNotEmpty()) "Preparing revision practice…" else "Preparing ${config?.mode?.label?.lowercase() ?: ""} practice…")
@@ -88,6 +92,7 @@ fun PracticeScreen(onDone: () -> Unit) {
   }
 
   if (sessionQuestions.isEmpty()) {
+    PublishTeacherContext(null)
     Column(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
       Text("Practice", style = MaterialTheme.typography.headlineMedium)
       Text(if (revisionIds.isNotEmpty()) "No valid revision questions are available." else config!!.mode.emptyMessage())
@@ -98,6 +103,7 @@ fun PracticeScreen(onDone: () -> Unit) {
   }
 
   if (index >= sessionQuestions.size) {
+    PublishTeacherContext(null)
     val summary = reviews.summary()
     LazyColumn(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
       item { Text(summary.resultHeadline(), style = MaterialTheme.typography.headlineMedium) }
@@ -144,6 +150,7 @@ fun PracticeScreen(onDone: () -> Unit) {
   val options = question.optionList()
   val correctAnswer = question.correctAnswer.trim().uppercase()
   val progress = PracticeProgress(index + 1, sessionQuestions.size)
+  PublishTeacherContext(question.asTeacherContext(options, answerRevealed = submitted))
 
   LazyColumn(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
     item {
