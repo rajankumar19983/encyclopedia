@@ -1,6 +1,5 @@
 package com.rajankumar.encyclopaedia.feature.backup
 
-import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
@@ -34,15 +33,11 @@ class DeviceBackupStore(
     preferences.edit().remove(DIRECTORY_KEY).apply()
   }
 
-  fun write(
-    name: String,
-    bytes: ByteArray
-  ): Uri {
+  fun write(name: String, bytes: ByteArray): Uri {
     require(isSupportedBackupFileName(name)) { "Unsupported Encyclopaedia backup filename" }
     val directory = requireDirectory()
     val file = directory.createFile(MIME_TYPE, name)
       ?: throw IOException("Unable to create backup file")
-
     try {
       context.contentResolver.openOutputStream(file.uri, "w")?.use { output ->
         output.write(bytes)
@@ -62,12 +57,7 @@ class DeviceBackupStore(
     .filter { file -> file.isFile && isSupportedBackupFileName(file.name.orEmpty()) }
     .mapNotNull { file ->
       val name = file.name ?: return@mapNotNull null
-      StoredBackupFile(
-        name = name,
-        uri = file.uri,
-        lastModified = file.lastModified(),
-        sizeBytes = file.length()
-      )
+      StoredBackupFile(name, file.uri, file.lastModified(), file.length())
     }
     .sortedByDescending(StoredBackupFile::lastModified)
 
@@ -77,11 +67,23 @@ class DeviceBackupStore(
     return file.delete()
   }
 
+  fun deleteByName(name: String): Boolean {
+    require(isSupportedBackupFileName(name)) { "Unsupported Encyclopaedia backup filename" }
+    val file = requireDirectory().listFiles().firstOrNull { it.name == name } ?: return false
+    return file.delete()
+  }
+
+  fun deleteAllBackups(): Int {
+    val files = requireDirectory().listFiles()
+      .filter { it.isFile && isSupportedBackupFileName(it.name.orEmpty()) }
+    return files.count { it.delete() }
+  }
+
   private fun requireDirectory(): DocumentFile {
-    val uri = configuredDirectory() ?: error("Device backup directory has not been selected")
+    val uri = configuredDirectory() ?: error("Backup directory has not been selected")
     return DocumentFile.fromTreeUri(context, uri)
       ?.takeIf { it.exists() && it.isDirectory }
-      ?: error("Configured device backup directory is unavailable")
+      ?: error("Configured backup directory is unavailable")
   }
 
   companion object {
