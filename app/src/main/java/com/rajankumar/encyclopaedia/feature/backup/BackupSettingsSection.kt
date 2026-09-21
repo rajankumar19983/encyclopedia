@@ -31,7 +31,7 @@ fun BackupSettingsSection() {
   val manager = remember(store) { DeviceBackupManager(store) }
   var configured by remember { mutableStateOf(store.configuredDirectory() != null) }
   var busy by remember { mutableStateOf(false) }
-  var status by remember { mutableStateOf(if (configured) "Device backup folder configured." else "Choose a folder to enable device backups.") }
+  var status by remember { mutableStateOf(if (configured) "Backup folder configured." else "Choose a local or cloud folder to enable backups.") }
   var restorePoints by remember { mutableStateOf(runCatching { manager.discoverRestorePoints() }.getOrDefault(emptyList())) }
   var pendingRestore by remember { mutableStateOf<BackupRestorePoint?>(null) }
 
@@ -41,15 +41,20 @@ fun BackupSettingsSection() {
         configured = true
         AutomaticBackupScheduler.schedule(context)
         restorePoints = runCatching { manager.discoverRestorePoints() }.getOrDefault(emptyList())
-        status = "Backup folder saved. Automatic backup runs daily around midnight."
-      }.onFailure { status = it.message ?: "Could not use that folder." }
+        status = "Backup location saved. Automatic backup runs daily around midnight."
+      }.onFailure { status = it.message ?: "Could not use that backup location." }
   }
 
   Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
     Text("Backup & restore", style = MaterialTheme.typography.titleLarge)
-    Text("Keep up to five validated restore points on your device. Automatic backup runs daily around local midnight.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(
+      "Choose any folder Android makes available, including device storage or a cloud provider such as Google Drive. The app keeps up to five validated restore points and never receives your cloud password.",
+      color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
     Text(status, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    OutlinedButton(onClick = { folderPicker.launch(store.configuredDirectory()) }) { Text(if (configured) "Change backup folder" else "Choose backup folder") }
+    OutlinedButton(onClick = { folderPicker.launch(store.configuredDirectory()) }) {
+      Text(if (configured) "Change backup location" else "Choose backup location")
+    }
     Button(enabled = configured && !busy, onClick = {
       busy = true
       status = "Creating backup…"
