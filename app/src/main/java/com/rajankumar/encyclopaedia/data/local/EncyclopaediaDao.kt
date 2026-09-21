@@ -60,10 +60,13 @@ interface EncyclopaediaDao {
   @Query("SELECT * FROM notebook_pages ORDER BY sortOrder, createdAt") suspend fun getAllNotebookPagesForBackup(): List<NotebookPageEntity>
   @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertNotebookPage(page: NotebookPageEntity)
   @Query("UPDATE notebook_pages SET background = :background, updatedAt = :now WHERE id = :id") suspend fun setNotebookPageBackground(id: String, background: String, now: Long = System.currentTimeMillis())
+  @Query("UPDATE notebook_pages SET title = :title, updatedAt = :now WHERE id = :id") suspend fun renameNotebookPage(id: String, title: String, now: Long = System.currentTimeMillis())
   @Query("DELETE FROM notebook_pages WHERE id = :id") suspend fun deleteNotebookPage(id: String)
   @Query("SELECT * FROM notebook_layers WHERE pageId = :pageId ORDER BY sortOrder, createdAt") fun observeNotebookLayers(pageId: String): Flow<List<NotebookLayerEntity>>
   @Query("SELECT * FROM notebook_layers ORDER BY pageId, sortOrder, createdAt") suspend fun getAllNotebookLayersForBackup(): List<NotebookLayerEntity>
   @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertNotebookLayer(layer: NotebookLayerEntity)
+  @Query("UPDATE notebook_layers SET name = :name, updatedAt = :now WHERE id = :id") suspend fun renameNotebookLayer(id: String, name: String, now: Long = System.currentTimeMillis())
+  @Query("UPDATE notebook_layers SET sortOrder = :sortOrder, updatedAt = :now WHERE id = :id") suspend fun setNotebookLayerSortOrder(id: String, sortOrder: Int, now: Long = System.currentTimeMillis())
   @Query("UPDATE notebook_layers SET isVisible = :visible, updatedAt = :now WHERE id = :id") suspend fun setNotebookLayerVisible(id: String, visible: Boolean, now: Long = System.currentTimeMillis())
   @Query("UPDATE notebook_layers SET isLocked = :locked, updatedAt = :now WHERE id = :id") suspend fun setNotebookLayerLocked(id: String, locked: Boolean, now: Long = System.currentTimeMillis())
   @Query("DELETE FROM notebook_layers WHERE id = :id") suspend fun deleteNotebookLayer(id: String)
