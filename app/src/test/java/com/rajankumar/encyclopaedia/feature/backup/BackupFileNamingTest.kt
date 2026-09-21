@@ -7,17 +7,23 @@ import org.junit.Test
 
 class BackupFileNamingTest {
   @Test
-  fun fileNameUsesStableUtcTimestamp() {
+  fun fileNameUsesStableUtcTimestampAndRestoreMetadata() {
     assertEquals(
-      "encyclopaedia-backup-1970-01-01_00-00-00.json",
+      "encyclopaedia_backup_1970-01-01_000000_manual_v1.encbackup",
       backupFileName(0L)
+    )
+    assertEquals(
+      "encyclopaedia_backup_1970-01-01_000000_automatic_v1.encbackup",
+      backupFileName(0L, BackupType.AUTOMATIC)
     )
   }
 
   @Test
-  fun supportedNameRequiresPrefixAndJsonExtension() {
-    assertTrue(isSupportedBackupFileName("encyclopaedia-backup-2026-09-19_17-25-04.json"))
-    assertFalse(isSupportedBackupFileName("backup.json"))
-    assertFalse(isSupportedBackupFileName("encyclopaedia-backup-2026-09-19.txt"))
+  fun supportedNameRequiresExactDiscoverableFormat() {
+    assertTrue(isSupportedBackupFileName("encyclopaedia_backup_2026-09-19_172504_automatic_v1.encbackup"))
+    assertTrue(isSupportedBackupFileName("encyclopaedia_backup_2026-09-19_172504_manual_v2.encbackup"))
+    assertFalse(isSupportedBackupFileName("backup.encbackup"))
+    assertFalse(isSupportedBackupFileName("encyclopaedia_backup_2026-09-19.json"))
+    assertFalse(isSupportedBackupFileName("encyclopaedia_backup_2026-09-19_172504_unknown_v1.encbackup"))
   }
 }
