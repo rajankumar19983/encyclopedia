@@ -11,12 +11,9 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface EncyclopaediaDao {
-  @Query("SELECT * FROM knowledge_nodes WHERE parentId IS NULL AND isArchived = 0 ORDER BY sortOrder, name")
-  fun observeRootNodes(): Flow<List<KnowledgeNodeEntity>>
-  @Query("SELECT * FROM knowledge_nodes WHERE parentId = :parentId AND isArchived = 0 ORDER BY sortOrder, name")
-  fun observeChildren(parentId: String): Flow<List<KnowledgeNodeEntity>>
-  @Query("SELECT * FROM knowledge_nodes WHERE isArchived = 0 ORDER BY name")
-  fun observeAllNodes(): Flow<List<KnowledgeNodeEntity>>
+  @Query("SELECT * FROM knowledge_nodes WHERE parentId IS NULL AND isArchived = 0 ORDER BY sortOrder, name") fun observeRootNodes(): Flow<List<KnowledgeNodeEntity>>
+  @Query("SELECT * FROM knowledge_nodes WHERE parentId = :parentId AND isArchived = 0 ORDER BY sortOrder, name") fun observeChildren(parentId: String): Flow<List<KnowledgeNodeEntity>>
+  @Query("SELECT * FROM knowledge_nodes WHERE isArchived = 0 ORDER BY name") fun observeAllNodes(): Flow<List<KnowledgeNodeEntity>>
   @Query("SELECT * FROM knowledge_nodes ORDER BY createdAt") suspend fun getAllNodesForBackup(): List<KnowledgeNodeEntity>
   @Query("SELECT COUNT(*) FROM knowledge_nodes WHERE isArchived = 0") fun observeTopicCount(): Flow<Int>
   @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertNode(node: KnowledgeNodeEntity)
@@ -64,48 +61,51 @@ interface EncyclopaediaDao {
   @Query("UPDATE planner_tasks SET isCompleted = :completed, completedAt = :completedAt, updatedAt = :now WHERE id = :id") suspend fun setPlannerTaskCompleted(id: String, completed: Boolean, completedAt: Long?, now: Long = System.currentTimeMillis())
   @Query("DELETE FROM planner_tasks WHERE id = :id") suspend fun deletePlannerTask(id: String)
 
+  @Query("SELECT * FROM notebook_pages ORDER BY sortOrder, updatedAt DESC") fun observeNotebookPages(): Flow<List<NotebookPageEntity>>
+  @Query("SELECT * FROM notebook_pages ORDER BY sortOrder, createdAt") suspend fun getAllNotebookPagesForBackup(): List<NotebookPageEntity>
+  @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertNotebookPage(page: NotebookPageEntity)
+  @Query("DELETE FROM notebook_pages WHERE id = :id") suspend fun deleteNotebookPage(id: String)
+  @Query("SELECT * FROM notebook_layers WHERE pageId = :pageId ORDER BY sortOrder, createdAt") fun observeNotebookLayers(pageId: String): Flow<List<NotebookLayerEntity>>
+  @Query("SELECT * FROM notebook_layers ORDER BY pageId, sortOrder, createdAt") suspend fun getAllNotebookLayersForBackup(): List<NotebookLayerEntity>
+  @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertNotebookLayer(layer: NotebookLayerEntity)
+  @Query("UPDATE notebook_layers SET isVisible = :visible, updatedAt = :now WHERE id = :id") suspend fun setNotebookLayerVisible(id: String, visible: Boolean, now: Long = System.currentTimeMillis())
+  @Query("UPDATE notebook_layers SET isLocked = :locked, updatedAt = :now WHERE id = :id") suspend fun setNotebookLayerLocked(id: String, locked: Boolean, now: Long = System.currentTimeMillis())
+  @Query("DELETE FROM notebook_layers WHERE id = :id") suspend fun deleteNotebookLayer(id: String)
+  @Query("SELECT * FROM notebook_strokes WHERE layerId = :layerId ORDER BY createdAt") fun observeNotebookStrokes(layerId: String): Flow<List<NotebookStrokeEntity>>
+  @Query("SELECT * FROM notebook_strokes ORDER BY layerId, createdAt") suspend fun getAllNotebookStrokesForBackup(): List<NotebookStrokeEntity>
+  @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertNotebookStroke(stroke: NotebookStrokeEntity)
+  @Query("DELETE FROM notebook_strokes WHERE id = :id") suspend fun deleteNotebookStroke(id: String)
+  @Query("DELETE FROM notebook_strokes WHERE layerId = :layerId") suspend fun clearNotebookLayer(layerId: String)
+
   @Query("DELETE FROM question_attempts") suspend fun deleteAllAttemptsForRestore()
   @Query("DELETE FROM question_topics") suspend fun deleteAllQuestionTopicsForRestore()
   @Query("DELETE FROM questions") suspend fun deleteAllQuestionsForRestore()
   @Query("DELETE FROM lessons") suspend fun deleteAllLessonsForRestore()
   @Query("DELETE FROM knowledge_nodes") suspend fun deleteAllNodesForRestore()
   @Query("DELETE FROM planner_tasks") suspend fun deleteAllPlannerTasksForRestore()
+  @Query("DELETE FROM notebook_strokes") suspend fun deleteAllNotebookStrokesForRestore()
+  @Query("DELETE FROM notebook_layers") suspend fun deleteAllNotebookLayersForRestore()
+  @Query("DELETE FROM notebook_pages") suspend fun deleteAllNotebookPagesForRestore()
 
   @Transaction
   suspend fun restoreSnapshot(snapshot: BackupSnapshot) {
     require(snapshot.isInternallyConsistent()) { "Backup snapshot is internally inconsistent" }
-    deleteAllAttemptsForRestore()
-    deleteAllQuestionTopicsForRestore()
-    deleteAllQuestionsForRestore()
-    deleteAllLessonsForRestore()
-    deleteAllNodesForRestore()
-    deleteAllPlannerTasksForRestore()
-    snapshot.knowledgeNodes.forEach { upsertNode(it) }
-    snapshot.lessons.forEach { upsertLesson(it) }
-    snapshot.questions.forEach { upsertQuestion(it) }
-    snapshot.questionTopics.forEach { upsertQuestionTopic(it) }
-    snapshot.attempts.forEach { insertAttempt(it) }
-    snapshot.plannerTasks.forEach { upsertPlannerTask(it) }
+    deleteAllAttemptsForRestore(); deleteAllQuestionTopicsForRestore(); deleteAllQuestionsForRestore(); deleteAllLessonsForRestore(); deleteAllNodesForRestore(); deleteAllPlannerTasksForRestore()
+    snapshot.knowledgeNodes.forEach { upsertNode(it) }; snapshot.lessons.forEach { upsertLesson(it) }; snapshot.questions.forEach { upsertQuestion(it) }; snapshot.questionTopics.forEach { upsertQuestionTopic(it) }; snapshot.attempts.forEach { insertAttempt(it) }; snapshot.plannerTasks.forEach { upsertPlannerTask(it) }
   }
 
   @Transaction
   suspend fun saveQuestion(question: QuestionEntity, topicId: String?) {
-    upsertQuestion(question)
-    clearQuestionTopics(question.id)
-    if (topicId != null) upsertQuestionTopic(QuestionTopicEntity(question.id, topicId))
+    upsertQuestion(question); clearQuestionTopics(question.id); if (topicId != null) upsertQuestionTopic(QuestionTopicEntity(question.id, topicId))
   }
 
   @Transaction
   suspend fun saveImportedQuestionIfUnique(question: QuestionEntity, topicId: String?): Boolean {
     val incomingQuestion = importFingerprint(question.questionText)
     val incomingOptions = question.options.lines().map(::importFingerprint).filter { it.isNotBlank() }
-    val duplicate = getAllQuestionsOnce().any { existing ->
-      importFingerprint(existing.questionText) == incomingQuestion &&
-        existing.options.lines().map(::importFingerprint).filter { it.isNotBlank() } == incomingOptions
-    }
+    val duplicate = getAllQuestionsOnce().any { existing -> importFingerprint(existing.questionText) == incomingQuestion && existing.options.lines().map(::importFingerprint).filter { it.isNotBlank() } == incomingOptions }
     if (duplicate) return false
-    saveQuestion(question, topicId)
-    return true
+    saveQuestion(question, topicId); return true
   }
 }
 
