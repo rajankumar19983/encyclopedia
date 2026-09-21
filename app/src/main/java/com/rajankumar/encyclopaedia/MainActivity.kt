@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.rememberNavController
+import com.rajankumar.encyclopaedia.feature.backup.AutomaticBackupScheduler
 import com.rajankumar.encyclopaedia.feature.teacher.OpenAiApiKeyStore
 import com.rajankumar.encyclopaedia.feature.teacher.OpenAiHttpApi
 import com.rajankumar.encyclopaedia.feature.teacher.OpenAiSettings
@@ -28,6 +29,7 @@ class MainActivity : ComponentActivity() {
       api = OpenAiHttpApi(),
       config = settings::read
     )
+    AutomaticBackupScheduler.schedule(applicationContext)
     enableEdgeToEdge()
     setContent {
       EncyclopaediaApp()
