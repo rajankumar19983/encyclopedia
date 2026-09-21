@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.rememberNavController
 import com.rajankumar.encyclopaedia.feature.teacher.OpenAiApiKeyStore
 import com.rajankumar.encyclopaedia.feature.teacher.OpenAiHttpApi
+import com.rajankumar.encyclopaedia.feature.teacher.OpenAiSettings
 import com.rajankumar.encyclopaedia.feature.teacher.OpenAiTeacherResponder
 import com.rajankumar.encyclopaedia.feature.teacher.TeacherResponderRegistry
 import com.rajankumar.encyclopaedia.navigation.EncyclopaediaShell
@@ -21,9 +22,11 @@ import com.rajankumar.encyclopaedia.ui.theme.EncyclopaediaTheme
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    val settings = OpenAiSettings(applicationContext)
     TeacherResponderRegistry.responder = OpenAiTeacherResponder(
       keyStore = OpenAiApiKeyStore(applicationContext),
-      api = OpenAiHttpApi()
+      api = OpenAiHttpApi(),
+      config = settings::read
     )
     enableEdgeToEdge()
     setContent {
