@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.rajankumar.encyclopaedia.feature.backup.BackupSettingsSection
 import com.rajankumar.encyclopaedia.feature.teacher.OpenAiApiKeyStore
 import com.rajankumar.encyclopaedia.feature.teacher.OpenAiConnectionManager
 import com.rajankumar.encyclopaedia.feature.teacher.OpenAiHttpApi
@@ -78,6 +79,8 @@ fun AccessibilitySettingsScreen() {
       Text("Preview voice")
     }
 
+    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+    BackupSettingsSection()
     HorizontalDivider(Modifier.padding(vertical = 8.dp))
 
     OpenAiSettingsScreen(
