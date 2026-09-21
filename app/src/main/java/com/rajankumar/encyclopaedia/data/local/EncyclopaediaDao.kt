@@ -59,6 +59,7 @@ interface EncyclopaediaDao {
   @Query("SELECT * FROM notebook_pages ORDER BY sortOrder, updatedAt DESC") fun observeNotebookPages(): Flow<List<NotebookPageEntity>>
   @Query("SELECT * FROM notebook_pages ORDER BY sortOrder, createdAt") suspend fun getAllNotebookPagesForBackup(): List<NotebookPageEntity>
   @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertNotebookPage(page: NotebookPageEntity)
+  @Query("UPDATE notebook_pages SET background = :background, updatedAt = :now WHERE id = :id") suspend fun setNotebookPageBackground(id: String, background: String, now: Long = System.currentTimeMillis())
   @Query("DELETE FROM notebook_pages WHERE id = :id") suspend fun deleteNotebookPage(id: String)
   @Query("SELECT * FROM notebook_layers WHERE pageId = :pageId ORDER BY sortOrder, createdAt") fun observeNotebookLayers(pageId: String): Flow<List<NotebookLayerEntity>>
   @Query("SELECT * FROM notebook_layers ORDER BY pageId, sortOrder, createdAt") suspend fun getAllNotebookLayersForBackup(): List<NotebookLayerEntity>
