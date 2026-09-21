@@ -1,40 +1,17 @@
 package com.rajankumar.encyclopaedia.feature.notebook
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.rajankumar.encyclopaedia.data.local.EncyclopaediaDatabase
-import com.rajankumar.encyclopaedia.data.local.NotebookLayerEntity
-import com.rajankumar.encyclopaedia.data.local.NotebookPageEntity
-import com.rajankumar.encyclopaedia.data.local.NotebookStrokeEntity
+import com.rajankumar.encyclopaedia.data.local.*
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -42,50 +19,38 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 private data class NotebookHistoryAction(val stroke: NotebookStrokeEntity, val added: Boolean)
+private val penColors = listOf(0xFF111111, 0xFF1D4ED8, 0xFFB91C1C, 0xFF15803D)
 
 @Composable
 fun NotebookScreen() {
-  val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
-  val scope = rememberCoroutineScope()
-  val pages by dao.observeNotebookPages().collectAsStateWithLifecycle(emptyList())
-  var title by remember { mutableStateOf("") }
-  var pageToDelete by remember { mutableStateOf<NotebookPageEntity?>(null) }
-  var selectedPage by remember { mutableStateOf<NotebookPageEntity?>(null) }
-  pageToDelete?.let { page -> AlertDialog(onDismissRequest = { pageToDelete = null }, title = { Text("Delete notebook page?") }, text = { Text("${page.title} and every layer and handwritten stroke on it will be permanently deleted.") }, confirmButton = { TextButton(onClick = { pageToDelete = null; scope.launch(Dispatchers.IO) { dao.deleteNotebookPage(page.id) } }) { Text("Delete") } }, dismissButton = { TextButton(onClick = { pageToDelete = null }) { Text("Cancel") } }) }
-  selectedPage?.let { page -> NotebookPageCanvas(page, onBack = { selectedPage = null }); return }
-  LazyColumn(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-    item { Text("Notebook", style = MaterialTheme.typography.headlineMedium); Text("Handwritten study pages are stored locally and included in your backups.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-    item { Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("New page", style = MaterialTheme.typography.titleMedium); OutlinedTextField(title, { title = it.take(100) }, label = { Text("Page title") }, modifier = Modifier.fillMaxWidth(), singleLine = true); Button(enabled = title.isNotBlank(), onClick = { val pageTitle=title.trim(); title=""; scope.launch(Dispatchers.IO) { val id=UUID.randomUUID().toString(); dao.upsertNotebookPage(NotebookPageEntity(id=id,title=pageTitle)); dao.upsertNotebookLayer(NotebookLayerEntity(id=UUID.randomUUID().toString(),pageId=id,name="Writing")) } }) { Text("Create page") } } } }
-    if (pages.isEmpty()) item { Text("No notebook pages yet. Create one above to start writing.") } else items(pages,key={it.id}) { page -> Card(Modifier.fillMaxWidth().clickable { selectedPage=page }) { Row(Modifier.fillMaxWidth().padding(16.dp),horizontalArrangement=Arrangement.SpaceBetween) { Column(Modifier.weight(1f)) { Text(page.title,style=MaterialTheme.typography.titleMedium); Text(page.background.lowercase().replaceFirstChar{it.uppercase()}+" page",color=MaterialTheme.colorScheme.onSurfaceVariant) }; TextButton(onClick={pageToDelete=page}) { Text("Delete",color=MaterialTheme.colorScheme.error) } } } }
+  val dao=EncyclopaediaDatabase.get(LocalContext.current).dao(); val scope=rememberCoroutineScope(); val pages by dao.observeNotebookPages().collectAsStateWithLifecycle(emptyList())
+  var title by remember{mutableStateOf("")}; var pageToDelete by remember{mutableStateOf<NotebookPageEntity?>(null)}; var selectedPageId by remember{mutableStateOf<String?>(null)}
+  pageToDelete?.let{page->AlertDialog(onDismissRequest={pageToDelete=null},title={Text("Delete notebook page?")},text={Text("${page.title} and every layer and handwritten stroke on it will be permanently deleted.")},confirmButton={TextButton(onClick={pageToDelete=null;scope.launch(Dispatchers.IO){dao.deleteNotebookPage(page.id)}}){Text("Delete")}},dismissButton={TextButton(onClick={pageToDelete=null}){Text("Cancel")}})}
+  val selectedPage=pages.firstOrNull{it.id==selectedPageId}; if(selectedPage!=null){NotebookPageCanvas(selectedPage){selectedPageId=null};return}
+  LazyColumn(Modifier.fillMaxSize().padding(28.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
+    item{Text("Notebook",style=MaterialTheme.typography.headlineMedium);Text("Handwritten study pages are stored locally and included in your backups.",color=MaterialTheme.colorScheme.onSurfaceVariant)}
+    item{Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){Text("New page",style=MaterialTheme.typography.titleMedium);OutlinedTextField(title,{title=it.take(100)},label={Text("Page title")},modifier=Modifier.fillMaxWidth(),singleLine=true);Button(enabled=title.isNotBlank(),onClick={val t=title.trim();title="";scope.launch(Dispatchers.IO){val id=UUID.randomUUID().toString();dao.upsertNotebookPage(NotebookPageEntity(id=id,title=t));dao.upsertNotebookLayer(NotebookLayerEntity(id=UUID.randomUUID().toString(),pageId=id,name="Writing"))}}){Text("Create page")}}}}
+    if(pages.isEmpty())item{Text("No notebook pages yet. Create one above to start writing.")}else items(pages,key={it.id}){page->Card(Modifier.fillMaxWidth().clickable{selectedPageId=page.id}){Row(Modifier.fillMaxWidth().padding(16.dp),horizontalArrangement=Arrangement.SpaceBetween){Column(Modifier.weight(1f)){Text(page.title,style=MaterialTheme.typography.titleMedium);Text(page.background.lowercase().replaceFirstChar{it.uppercase()}+" page",color=MaterialTheme.colorScheme.onSurfaceVariant)};TextButton(onClick={pageToDelete=page}){Text("Delete",color=MaterialTheme.colorScheme.error)}}}}
   }
 }
 
 @Composable
-private fun NotebookPageCanvas(page: NotebookPageEntity, onBack: () -> Unit) {
-  val dao=EncyclopaediaDatabase.get(LocalContext.current).dao(); val scope=rememberCoroutineScope()
-  val layers by dao.observeNotebookLayers(page.id).collectAsStateWithLifecycle(emptyList())
-  val pageStrokes by dao.observeNotebookPageStrokes(page.id).collectAsStateWithLifecycle(emptyList())
-  var selectedLayerId by remember { mutableStateOf<String?>(null) }
-  val selectedLayer=layers.firstOrNull{it.id==selectedLayerId} ?: layers.firstOrNull{it.isVisible&&!it.isLocked}
-  val writableLayer=selectedLayer?.takeIf{it.isVisible&&!it.isLocked}
-  var palmRejection by remember{mutableStateOf(true)}; var selectedTool by remember{mutableStateOf(NotebookTool.PEN)}; var newLayerName by remember{mutableStateOf("")}; var layerToDelete by remember{mutableStateOf<NotebookLayerEntity?>(null)}
-  val undoStack=remember{mutableStateListOf<NotebookHistoryAction>()}; val redoStack=remember{mutableStateListOf<NotebookHistoryAction>()}
-  val visibleLayerIds=remember(layers){layers.filter{it.isVisible}.map{it.id}.toSet()}
-  val decodedPageStrokes=remember(pageStrokes){pageStrokes.mapNotNull{e->decodeStroke(e)?.let{e to it}}}
-  val canvasStrokes=remember(decodedPageStrokes,visibleLayerIds){decodedPageStrokes.filter{it.first.layerId in visibleLayerIds}.map{it.second}}
-  val selectedDecoded=remember(decodedPageStrokes,selectedLayer?.id){decodedPageStrokes.filter{it.first.layerId==selectedLayer?.id}}
-
-  layerToDelete?.let{layer->AlertDialog(onDismissRequest={layerToDelete=null},title={Text("Delete layer?")},text={Text("${layer.name} and every stroke on it will be permanently deleted.")},confirmButton={TextButton(onClick={layerToDelete=null;undoStack.clear();redoStack.clear();scope.launch(Dispatchers.IO){dao.deleteNotebookLayer(layer.id)}}){Text("Delete")}},dismissButton={TextButton(onClick={layerToDelete=null}){Text("Cancel")}})}
-  Column(Modifier.fillMaxSize().padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){TextButton(onClick=onBack){Text("← Pages")};Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){Text("Palm rejection");Switch(palmRejection,{palmRejection=it})}}
+private fun NotebookPageCanvas(page:NotebookPageEntity,onBack:()->Unit){
+  val dao=EncyclopaediaDatabase.get(LocalContext.current).dao();val scope=rememberCoroutineScope();val layers by dao.observeNotebookLayers(page.id).collectAsStateWithLifecycle(emptyList());val pageStrokes by dao.observeNotebookPageStrokes(page.id).collectAsStateWithLifecycle(emptyList())
+  var selectedLayerId by remember{mutableStateOf<String?>(null)};val selectedLayer=layers.firstOrNull{it.id==selectedLayerId}?:layers.firstOrNull{it.isVisible&&!it.isLocked};val writableLayer=selectedLayer?.takeIf{it.isVisible&&!it.isLocked}
+  var palm by remember{mutableStateOf(true)};var tool by remember{mutableStateOf(NotebookTool.PEN)};var penWidth by remember{mutableStateOf(4f)};var penColor by remember{mutableStateOf(0xFF111111)};var newLayer by remember{mutableStateOf("")};var deleteLayer by remember{mutableStateOf<NotebookLayerEntity?>(null)}
+  val background=runCatching{NotebookBackground.valueOf(page.background)}.getOrDefault(NotebookBackground.PLAIN);val undo=remember{mutableStateListOf<NotebookHistoryAction>()};val redo=remember{mutableStateListOf<NotebookHistoryAction>()};val visibleIds=remember(layers){layers.filter{it.isVisible}.map{it.id}.toSet()};val decoded=remember(pageStrokes){pageStrokes.mapNotNull{e->decodeStroke(e)?.let{e to it}}};val canvas=remember(decoded,visibleIds){decoded.filter{it.first.layerId in visibleIds}.map{it.second}};val selected=remember(decoded,selectedLayer?.id){decoded.filter{it.first.layerId==selectedLayer?.id}}
+  deleteLayer?.let{l->AlertDialog(onDismissRequest={deleteLayer=null},title={Text("Delete layer?")},text={Text("${l.name} and every stroke on it will be permanently deleted.")},confirmButton={TextButton(onClick={deleteLayer=null;undo.clear();redo.clear();scope.launch(Dispatchers.IO){dao.deleteNotebookLayer(l.id)}}){Text("Delete")}},dismissButton={TextButton(onClick={deleteLayer=null}){Text("Cancel")}})}
+  Column(Modifier.fillMaxSize().padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){TextButton(onClick=onBack){Text("← Pages")};Row{Text("Palm rejection");Switch(palm,{palm=it})}}
     Text(page.title,style=MaterialTheme.typography.headlineSmall)
-    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){FilterChip(selectedTool==NotebookTool.PEN,{selectedTool=NotebookTool.PEN},label={Text("Pen")});FilterChip(selectedTool==NotebookTool.ERASER,{selectedTool=NotebookTool.ERASER},label={Text("Eraser")});OutlinedButton(enabled=undoStack.isNotEmpty(),onClick={val a=undoStack.removeLastOrNull()?:return@OutlinedButton;redoStack.add(a);scope.launch(Dispatchers.IO){if(a.added)dao.deleteNotebookStroke(a.stroke.id)else dao.upsertNotebookStroke(a.stroke)}}){Text("Undo")};OutlinedButton(enabled=redoStack.isNotEmpty(),onClick={val a=redoStack.removeLastOrNull()?:return@OutlinedButton;undoStack.add(a);scope.launch(Dispatchers.IO){if(a.added)dao.upsertNotebookStroke(a.stroke)else dao.deleteNotebookStroke(a.stroke.id)}}){Text("Redo")}}
-    Text(if(palmRejection)"Stylus only — finger and palm touches are ignored." else "Touch drawing enabled.",color=MaterialTheme.colorScheme.onSurfaceVariant)
-    Card(Modifier.fillMaxWidth()){Column(Modifier.padding(10.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){Text("Layers",style=MaterialTheme.typography.titleSmall);layers.forEach{layer->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){FilterChip(selected=selectedLayer?.id==layer.id,onClick={selectedLayerId=layer.id;undoStack.clear();redoStack.clear()},label={Text(layer.name)});Row{TextButton(onClick={scope.launch(Dispatchers.IO){dao.setNotebookLayerVisible(layer.id,!layer.isVisible)}}){Text(if(layer.isVisible)"Hide" else "Show")};TextButton(onClick={scope.launch(Dispatchers.IO){dao.setNotebookLayerLocked(layer.id,!layer.isLocked)}}){Text(if(layer.isLocked)"Unlock" else "Lock")};if(layers.size>1)TextButton(onClick={layerToDelete=layer}){Text("Delete",color=MaterialTheme.colorScheme.error)}}}};Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedTextField(newLayerName,{newLayerName=it.take(40)},label={Text("New layer")},singleLine=true,modifier=Modifier.weight(1f));Button(enabled=newLayerName.isNotBlank(),onClick={val name=newLayerName.trim();newLayerName="";val id=UUID.randomUUID().toString();scope.launch(Dispatchers.IO){dao.upsertNotebookLayer(NotebookLayerEntity(id=id,pageId=page.id,name=name,sortOrder=layers.size))};selectedLayerId=id;undoStack.clear();redoStack.clear()}){Text("Add")}}}}
-    Card(Modifier.fillMaxWidth().weight(1f)){NotebookCanvas(strokes=canvasStrokes,palmRejection=palmRejection,selectedTool=selectedTool,onStrokeFinished={stroke->val layer=writableLayer?:return@NotebookCanvas;val entity=NotebookStrokeEntity(id=UUID.randomUUID().toString(),layerId=layer.id,pointsJson=encodePoints(stroke),width=stroke.width,tool=stroke.tool.name);undoStack.add(NotebookHistoryAction(entity,true));redoStack.clear();scope.launch(Dispatchers.IO){dao.upsertNotebookStroke(entity)}},onEraseAt={point->val layer=writableLayer?:return@NotebookCanvas;val hit=selectedDecoded.lastOrNull{(_,s)->s.isNear(point)}?.first;if(hit!=null){undoStack.add(NotebookHistoryAction(hit,false));redoStack.clear();scope.launch(Dispatchers.IO){dao.deleteNotebookStroke(hit.id)}}},modifier=Modifier.fillMaxSize())}
-    if(writableLayer==null) Text("Selected layer is hidden or locked. It remains visible when applicable, but cannot be edited.",color=MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){NotebookBackground.entries.forEach{b->FilterChip(selected=background==b,onClick={scope.launch(Dispatchers.IO){dao.setNotebookPageBackground(page.id,b.name)}},label={Text(b.name.lowercase().replaceFirstChar{it.uppercase()})})}}
+    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){FilterChip(tool==NotebookTool.PEN,{tool=NotebookTool.PEN},label={Text("Pen")});FilterChip(tool==NotebookTool.ERASER,{tool=NotebookTool.ERASER},label={Text("Eraser")});listOf(2.5f,4f,7f).forEach{w->FilterChip(penWidth==w,{penWidth=w},label={Text(if(w<3)"Fine" else if(w<6)"Medium" else "Bold")})};OutlinedButton(enabled=undo.isNotEmpty(),onClick={val a=undo.removeLastOrNull()?:return@OutlinedButton;redo.add(a);scope.launch(Dispatchers.IO){if(a.added)dao.deleteNotebookStroke(a.stroke.id)else dao.upsertNotebookStroke(a.stroke)}}){Text("Undo")};OutlinedButton(enabled=redo.isNotEmpty(),onClick={val a=redo.removeLastOrNull()?:return@OutlinedButton;undo.add(a);scope.launch(Dispatchers.IO){if(a.added)dao.upsertNotebookStroke(a.stroke)else dao.deleteNotebookStroke(a.stroke.id)}}){Text("Redo")}}
+    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){Text("Ink:");penColors.forEachIndexed{i,c->FilterChip(selected=penColor==c,onClick={penColor=c},label={Text(listOf("Black","Blue","Red","Green")[i])})}}
+    Card(Modifier.fillMaxWidth()){Column(Modifier.padding(10.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){Text("Layers",style=MaterialTheme.typography.titleSmall);layers.forEach{l->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){FilterChip(selectedLayer?.id==l.id,{selectedLayerId=l.id;undo.clear();redo.clear()},label={Text(l.name)});Row{TextButton(onClick={scope.launch(Dispatchers.IO){dao.setNotebookLayerVisible(l.id,!l.isVisible)}}){Text(if(l.isVisible)"Hide" else "Show")};TextButton(onClick={scope.launch(Dispatchers.IO){dao.setNotebookLayerLocked(l.id,!l.isLocked)}}){Text(if(l.isLocked)"Unlock" else "Lock")};if(layers.size>1)TextButton(onClick={deleteLayer=l}){Text("Delete",color=MaterialTheme.colorScheme.error)}}}};Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedTextField(newLayer,{newLayer=it.take(40)},label={Text("New layer")},singleLine=true,modifier=Modifier.weight(1f));Button(enabled=newLayer.isNotBlank(),onClick={val n=newLayer.trim();newLayer="";val id=UUID.randomUUID().toString();scope.launch(Dispatchers.IO){dao.upsertNotebookLayer(NotebookLayerEntity(id=id,pageId=page.id,name=n,sortOrder=layers.size))};selectedLayerId=id;undo.clear();redo.clear()}){Text("Add")}}}}
+    Card(Modifier.fillMaxWidth().weight(1f)){NotebookCanvas(strokes=canvas,palmRejection=palm,selectedTool=tool,penWidth=penWidth,penColorArgb=penColor,background=background,onStrokeFinished={s->val l=writableLayer?:return@NotebookCanvas;val e=NotebookStrokeEntity(id=UUID.randomUUID().toString(),layerId=l.id,pointsJson=encodePoints(s),width=s.width,tool=s.tool.name,colorArgb=s.colorArgb);undo.add(NotebookHistoryAction(e,true));redo.clear();scope.launch(Dispatchers.IO){dao.upsertNotebookStroke(e)}},onEraseAt={p->writableLayer?:return@NotebookCanvas;val hit=selected.lastOrNull{(_,s)->s.isNear(p)}?.first;if(hit!=null){undo.add(NotebookHistoryAction(hit,false));redo.clear();scope.launch(Dispatchers.IO){dao.deleteNotebookStroke(hit.id)}}},modifier=Modifier.fillMaxSize())}
+    if(writableLayer==null)Text("Selected layer is hidden or locked. It remains visible when applicable, but cannot be edited.",color=MaterialTheme.colorScheme.onSurfaceVariant)
   }
 }
-
-private fun encodePoints(stroke:CanvasStroke):String=JSONArray().apply{stroke.points.forEach{put(JSONObject().put("x",it.x.toDouble()).put("y",it.y.toDouble()))}}.toString()
-private fun decodeStroke(stroke:NotebookStrokeEntity):CanvasStroke?=runCatching{val a=JSONArray(stroke.pointsJson);val p=(0 until a.length()).map{i->val o=a.getJSONObject(i);Offset(o.getDouble("x").toFloat(),o.getDouble("y").toFloat())};CanvasStroke(p,stroke.width,runCatching{NotebookTool.valueOf(stroke.tool)}.getOrDefault(NotebookTool.PEN))}.getOrNull()
+private fun encodePoints(s:CanvasStroke)=JSONArray().apply{s.points.forEach{put(JSONObject().put("x",it.x.toDouble()).put("y",it.y.toDouble()))}}.toString()
+private fun decodeStroke(e:NotebookStrokeEntity):CanvasStroke?=runCatching{val a=JSONArray(e.pointsJson);val p=(0 until a.length()).map{i->val o=a.getJSONObject(i);Offset(o.getDouble("x").toFloat(),o.getDouble("y").toFloat())};CanvasStroke(p,e.width,runCatching{NotebookTool.valueOf(e.tool)}.getOrDefault(NotebookTool.PEN),e.colorArgb)}.getOrNull()
