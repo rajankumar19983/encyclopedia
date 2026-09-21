@@ -45,6 +45,9 @@ dependencies {
   // Bundled Latin-script OCR model: available immediately and works offline.
   implementation("com.google.mlkit:text-recognition:16.0.1")
 
+  // Direct HTTPS transport for user-owned OpenAI API credentials.
+  implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
   implementation(platform("androidx.compose:compose-bom:2026.02.01"))
   implementation("androidx.compose.ui:ui")
   implementation("androidx.compose.ui:ui-tooling-preview")
