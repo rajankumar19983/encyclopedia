@@ -67,6 +67,7 @@ interface EncyclopaediaDao {
   @Query("UPDATE notebook_layers SET isLocked = :locked, updatedAt = :now WHERE id = :id") suspend fun setNotebookLayerLocked(id: String, locked: Boolean, now: Long = System.currentTimeMillis())
   @Query("DELETE FROM notebook_layers WHERE id = :id") suspend fun deleteNotebookLayer(id: String)
   @Query("SELECT * FROM notebook_strokes WHERE layerId = :layerId ORDER BY createdAt") fun observeNotebookStrokes(layerId: String): Flow<List<NotebookStrokeEntity>>
+  @Query("SELECT s.* FROM notebook_strokes s INNER JOIN notebook_layers l ON l.id = s.layerId WHERE l.pageId = :pageId ORDER BY l.sortOrder, l.createdAt, s.createdAt") fun observeNotebookPageStrokes(pageId: String): Flow<List<NotebookStrokeEntity>>
   @Query("SELECT * FROM notebook_strokes ORDER BY layerId, createdAt") suspend fun getAllNotebookStrokesForBackup(): List<NotebookStrokeEntity>
   @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertNotebookStroke(stroke: NotebookStrokeEntity)
   @Query("DELETE FROM notebook_strokes WHERE id = :id") suspend fun deleteNotebookStroke(id: String)
@@ -80,12 +81,7 @@ interface EncyclopaediaDao {
   @Query("DELETE FROM notebook_strokes") suspend fun deleteAllNotebookStrokesForRestore()
   @Query("DELETE FROM notebook_layers") suspend fun deleteAllNotebookLayersForRestore()
   @Query("DELETE FROM notebook_pages") suspend fun deleteAllNotebookPagesForRestore()
-
-  @Transaction suspend fun restoreSnapshot(snapshot: BackupSnapshot) {
-    require(snapshot.isInternallyConsistent())
-    deleteAllNotebookStrokesForRestore(); deleteAllNotebookLayersForRestore(); deleteAllNotebookPagesForRestore(); deleteAllAttemptsForRestore(); deleteAllQuestionTopicsForRestore(); deleteAllQuestionsForRestore(); deleteAllLessonsForRestore(); deleteAllNodesForRestore(); deleteAllPlannerTasksForRestore()
-    snapshot.knowledgeNodes.forEach { upsertNode(it) }; snapshot.lessons.forEach { upsertLesson(it) }; snapshot.questions.forEach { upsertQuestion(it) }; snapshot.questionTopics.forEach { upsertQuestionTopic(it) }; snapshot.attempts.forEach { insertAttempt(it) }; snapshot.plannerTasks.forEach { upsertPlannerTask(it) }; snapshot.notebookPages.forEach { upsertNotebookPage(it) }; snapshot.notebookLayers.forEach { upsertNotebookLayer(it) }; snapshot.notebookStrokes.forEach { upsertNotebookStroke(it) }
-  }
+  @Transaction suspend fun restoreSnapshot(snapshot: BackupSnapshot) { require(snapshot.isInternallyConsistent()); deleteAllNotebookStrokesForRestore(); deleteAllNotebookLayersForRestore(); deleteAllNotebookPagesForRestore(); deleteAllAttemptsForRestore(); deleteAllQuestionTopicsForRestore(); deleteAllQuestionsForRestore(); deleteAllLessonsForRestore(); deleteAllNodesForRestore(); deleteAllPlannerTasksForRestore(); snapshot.knowledgeNodes.forEach { upsertNode(it) }; snapshot.lessons.forEach { upsertLesson(it) }; snapshot.questions.forEach { upsertQuestion(it) }; snapshot.questionTopics.forEach { upsertQuestionTopic(it) }; snapshot.attempts.forEach { insertAttempt(it) }; snapshot.plannerTasks.forEach { upsertPlannerTask(it) }; snapshot.notebookPages.forEach { upsertNotebookPage(it) }; snapshot.notebookLayers.forEach { upsertNotebookLayer(it) }; snapshot.notebookStrokes.forEach { upsertNotebookStroke(it) } }
   @Transaction suspend fun saveQuestion(question: QuestionEntity, topicId: String?) { upsertQuestion(question); clearQuestionTopics(question.id); if (topicId != null) upsertQuestionTopic(QuestionTopicEntity(question.id, topicId)) }
   @Transaction suspend fun saveImportedQuestionIfUnique(question: QuestionEntity, topicId: String?): Boolean { val q=importFingerprint(question.questionText); val opts=question.options.lines().map(::importFingerprint).filter{it.isNotBlank()}; if(getAllQuestionsOnce().any{importFingerprint(it.questionText)==q && it.options.lines().map(::importFingerprint).filter{x->x.isNotBlank()}==opts}) return false; saveQuestion(question,topicId); return true }
 }
