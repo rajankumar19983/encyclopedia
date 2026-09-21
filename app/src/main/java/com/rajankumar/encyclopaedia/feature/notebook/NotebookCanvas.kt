@@ -19,7 +19,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-internal enum class NotebookTool { PEN, ERASER }
+internal enum class NotebookTool { PEN, HIGHLIGHTER, ERASER }
 internal enum class NotebookBackground { PLAIN, LINED, GRID }
 
 internal data class CanvasStroke(
@@ -31,14 +31,9 @@ internal data class CanvasStroke(
 
 @Composable
 internal fun NotebookCanvas(
-  strokes: List<CanvasStroke>,
-  palmRejection: Boolean,
-  selectedTool: NotebookTool,
-  penWidth: Float,
-  penColorArgb: Long,
-  background: NotebookBackground,
-  onStrokeFinished: (CanvasStroke) -> Unit,
-  onEraseAt: (Offset) -> Unit,
+  strokes: List<CanvasStroke>, palmRejection: Boolean, selectedTool: NotebookTool,
+  penWidth: Float, penColorArgb: Long, background: NotebookBackground,
+  onStrokeFinished: (CanvasStroke) -> Unit, onEraseAt: (Offset) -> Unit,
   modifier: Modifier = Modifier
 ) {
   var activePoints by remember { mutableStateOf<List<Offset>>(emptyList()) }
@@ -47,101 +42,26 @@ internal fun NotebookCanvas(
   var activePointerId by remember { mutableStateOf(-1) }
   var eventTool by remember { mutableStateOf(selectedTool) }
 
-  fun appendPoint(point: Offset) {
-    val last = activePoints.lastOrNull()
-    if (last == null || abs(last.x - point.x) >= 0.5f || abs(last.y - point.y) >= 0.5f) activePoints = activePoints + point
-  }
+  fun appendPoint(point: Offset) { val last=activePoints.lastOrNull();if(last==null||abs(last.x-point.x)>=.5f||abs(last.y-point.y)>=.5f)activePoints=activePoints+point }
+  fun historical(event:MotionEvent,index:Int){for(h in 0 until event.historySize)appendPoint(Offset(event.getHistoricalX(index,h),event.getHistoricalY(index,h)))}
 
-  fun consumeHistoricalPoints(event: MotionEvent, pointerIndex: Int) {
-    for (historyIndex in 0 until event.historySize) appendPoint(Offset(event.getHistoricalX(pointerIndex, historyIndex), event.getHistoricalY(pointerIndex, historyIndex)))
-  }
-
-  Canvas(modifier = modifier.pointerInteropFilter { event ->
-    val actionIndex = event.actionIndex.coerceAtLeast(0)
-    val hardwareTool = runCatching { event.getToolType(actionIndex) }.getOrDefault(MotionEvent.TOOL_TYPE_UNKNOWN)
-    val isStylus = hardwareTool == MotionEvent.TOOL_TYPE_STYLUS || hardwareTool == MotionEvent.TOOL_TYPE_ERASER
-    when (event.actionMasked) {
-      MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> if (!acceptingPointer && (!palmRejection || isStylus)) {
-        acceptingPointer = true
-        activePointerId = event.getPointerId(actionIndex)
-        eventTool = if (hardwareTool == MotionEvent.TOOL_TYPE_ERASER) NotebookTool.ERASER else selectedTool
-        val point = Offset(event.getX(actionIndex), event.getY(actionIndex))
-        if (eventTool == NotebookTool.ERASER) onEraseAt(point) else {
-          activePoints = listOf(point)
-          val pressure = event.getPressure(actionIndex).coerceIn(.1f, 1f)
-          activeWidth = penWidth * (.65f + pressure * .7f)
-        }
-      }
-      MotionEvent.ACTION_MOVE -> if (acceptingPointer) {
-        val index = event.findPointerIndex(activePointerId)
-        if (index >= 0) {
-          if (eventTool == NotebookTool.ERASER) {
-            for (historyIndex in 0 until event.historySize) onEraseAt(Offset(event.getHistoricalX(index, historyIndex), event.getHistoricalY(index, historyIndex)))
-            onEraseAt(Offset(event.getX(index), event.getY(index)))
-          } else {
-            consumeHistoricalPoints(event, index)
-            appendPoint(Offset(event.getX(index), event.getY(index)))
-          }
-        }
-      }
-      MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> if (acceptingPointer && event.getPointerId(actionIndex) == activePointerId) {
-        if (eventTool == NotebookTool.PEN && activePoints.isNotEmpty()) onStrokeFinished(CanvasStroke(activePoints, activeWidth, colorArgb = penColorArgb))
-        activePoints = emptyList(); acceptingPointer = false; activePointerId = -1
-      }
-      MotionEvent.ACTION_CANCEL -> { activePoints = emptyList(); acceptingPointer = false; activePointerId = -1 }
-    }
-    acceptingPointer
-  }) {
-    drawRect(Color.White)
-    val guide = Color(0xFFE1E5EA); val spacing = 48f
-    if (background == NotebookBackground.LINED || background == NotebookBackground.GRID) {
-      var y = spacing
-      while (y < size.height) { drawLine(guide, Offset(0f, y), Offset(size.width, y), 1f); y += spacing }
-    }
-    if (background == NotebookBackground.GRID) {
-      var x = spacing
-      while (x < size.width) { drawLine(guide, Offset(x, 0f), Offset(x, size.height), 1f); x += spacing }
-    }
-    fun drawStroke(s: CanvasStroke) {
-      if (s.points.isEmpty() || s.tool != NotebookTool.PEN) return
-      val color = Color(s.colorArgb.toULong())
-      if (s.points.size == 1) { drawCircle(color, s.width / 2f, s.points.first()); return }
-      val path = Path().apply {
-        moveTo(s.points.first().x, s.points.first().y)
-        if (s.points.size == 2) lineTo(s.points[1].x, s.points[1].y) else {
-          for (i in 1 until s.points.lastIndex) {
-            val current = s.points[i]; val next = s.points[i + 1]
-            quadraticBezierTo(current.x, current.y, (current.x + next.x) / 2f, (current.y + next.y) / 2f)
-          }
-          lineTo(s.points.last().x, s.points.last().y)
-        }
-      }
-      drawPath(path, color, style = Stroke(width = s.width, cap = StrokeCap.Round, join = StrokeJoin.Round))
-    }
-    strokes.forEach(::drawStroke)
-    drawStroke(CanvasStroke(activePoints, activeWidth, colorArgb = penColorArgb))
+  Canvas(modifier=modifier.pointerInteropFilter{event->
+    val ai=event.actionIndex.coerceAtLeast(0);val hardware=runCatching{event.getToolType(ai)}.getOrDefault(MotionEvent.TOOL_TYPE_UNKNOWN);val stylus=hardware==MotionEvent.TOOL_TYPE_STYLUS||hardware==MotionEvent.TOOL_TYPE_ERASER
+    when(event.actionMasked){
+      MotionEvent.ACTION_DOWN,MotionEvent.ACTION_POINTER_DOWN->if(!acceptingPointer&&(!palmRejection||stylus)){acceptingPointer=true;activePointerId=event.getPointerId(ai);eventTool=if(hardware==MotionEvent.TOOL_TYPE_ERASER)NotebookTool.ERASER else selectedTool;val p=Offset(event.getX(ai),event.getY(ai));if(eventTool==NotebookTool.ERASER)onEraseAt(p)else{activePoints=listOf(p);val pressure=event.getPressure(ai).coerceIn(.1f,1f);activeWidth=if(eventTool==NotebookTool.HIGHLIGHTER)penWidth*4f else penWidth*(.65f+pressure*.7f)}}
+      MotionEvent.ACTION_MOVE->if(acceptingPointer){val i=event.findPointerIndex(activePointerId);if(i>=0){if(eventTool==NotebookTool.ERASER){for(h in 0 until event.historySize)onEraseAt(Offset(event.getHistoricalX(i,h),event.getHistoricalY(i,h)));onEraseAt(Offset(event.getX(i),event.getY(i)))}else{historical(event,i);appendPoint(Offset(event.getX(i),event.getY(i)))}}}
+      MotionEvent.ACTION_UP,MotionEvent.ACTION_POINTER_UP->if(acceptingPointer&&event.getPointerId(ai)==activePointerId){if(eventTool!=NotebookTool.ERASER&&activePoints.isNotEmpty())onStrokeFinished(CanvasStroke(activePoints,activeWidth,eventTool,penColorArgb));activePoints=emptyList();acceptingPointer=false;activePointerId=-1}
+      MotionEvent.ACTION_CANCEL->{activePoints=emptyList();acceptingPointer=false;activePointerId=-1}
+    };acceptingPointer
+  }){
+    drawRect(Color.White);val guide=Color(0xFFE1E5EA);val spacing=48f
+    if(background==NotebookBackground.LINED||background==NotebookBackground.GRID){var y=spacing;while(y<size.height){drawLine(guide,Offset(0f,y),Offset(size.width,y),1f);y+=spacing}}
+    if(background==NotebookBackground.GRID){var x=spacing;while(x<size.width){drawLine(guide,Offset(x,0f),Offset(x,size.height),1f);x+=spacing}}
+    fun drawStroke(s:CanvasStroke){if(s.points.isEmpty()||s.tool==NotebookTool.ERASER)return;val base=Color(s.colorArgb.toULong());val color=if(s.tool==NotebookTool.HIGHLIGHTER)base.copy(alpha=.32f)else base;if(s.points.size==1){drawCircle(color,s.width/2f,s.points.first());return};val path=Path().apply{moveTo(s.points.first().x,s.points.first().y);if(s.points.size==2)lineTo(s.points[1].x,s.points[1].y)else{for(i in 1 until s.points.lastIndex){val c=s.points[i];val n=s.points[i+1];quadraticBezierTo(c.x,c.y,(c.x+n.x)/2f,(c.y+n.y)/2f)};lineTo(s.points.last().x,s.points.last().y)}};drawPath(path,color,style=Stroke(width=s.width,cap=StrokeCap.Round,join=StrokeJoin.Round))}
+    strokes.forEach(::drawStroke);if(eventTool!=NotebookTool.ERASER)drawStroke(CanvasStroke(activePoints,activeWidth,eventTool,penColorArgb))
   }
 }
 
-internal fun CanvasStroke.isNear(point: Offset, radius: Float = 28f): Boolean {
-  if (points.isEmpty()) return false
-  val hitRadius = radius + width / 2f
-  val radiusSquared = hitRadius * hitRadius
-  if (points.size == 1) return distanceSquared(points.first(), point) <= radiusSquared
-  return points.zipWithNext().any { (start, end) -> pointToSegmentDistanceSquared(point, start, end) <= radiusSquared }
-}
-
-private fun distanceSquared(a: Offset, b: Offset): Float {
-  val dx = a.x - b.x; val dy = a.y - b.y
-  return dx * dx + dy * dy
-}
-
-private fun pointToSegmentDistanceSquared(point: Offset, start: Offset, end: Offset): Float {
-  val dx = end.x - start.x; val dy = end.y - start.y
-  val lengthSquared = dx * dx + dy * dy
-  if (lengthSquared <= 0.0001f) return distanceSquared(point, start)
-  val projection = ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared
-  val t = max(0f, min(1f, projection))
-  val closest = Offset(start.x + t * dx, start.y + t * dy)
-  return distanceSquared(point, closest)
-}
+internal fun CanvasStroke.isNear(point:Offset,radius:Float=28f):Boolean{if(points.isEmpty())return false;val r=radius+width/2f;val r2=r*r;if(points.size==1)return distanceSquared(points.first(),point)<=r2;return points.zipWithNext().any{(a,b)->pointToSegmentDistanceSquared(point,a,b)<=r2}}
+private fun distanceSquared(a:Offset,b:Offset):Float{val dx=a.x-b.x;val dy=a.y-b.y;return dx*dx+dy*dy}
+private fun pointToSegmentDistanceSquared(p:Offset,a:Offset,b:Offset):Float{val dx=b.x-a.x;val dy=b.y-a.y;val len=dx*dx+dy*dy;if(len<=.0001f)return distanceSquared(p,a);val projection=((p.x-a.x)*dx+(p.y-a.y)*dy)/len;val t=max(0f,min(1f,projection));return distanceSquared(p,Offset(a.x+t*dx,a.y+t*dy))}
