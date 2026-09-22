@@ -13,6 +13,19 @@ fun BackupSnapshot.hasUniquePrimaryIds(): Boolean =
     notebookStrokes.map { it.id }.allUnique() &&
     questionTopics.map { it.questionId to it.knowledgeNodeId }.let { it.size == it.toSet().size }
 
+fun BackupSnapshot.hasAcyclicKnowledgeHierarchy(): Boolean {
+  val parents = knowledgeNodes.associate { it.id to it.parentId }
+  for (node in knowledgeNodes) {
+    val visited = mutableSetOf<String>()
+    var current: String? = node.id
+    while (current != null) {
+      if (!visited.add(current)) return false
+      current = parents[current]
+    }
+  }
+  return true
+}
+
 fun BackupSnapshot.hasValidStudyRelationships(): Boolean {
   val nodeIds = knowledgeNodes.map { it.id }.toSet()
   val questionIds = questions.map { it.id }.toSet()
@@ -34,4 +47,4 @@ fun BackupSnapshot.hasValidNotebookRelationships(): Boolean {
 }
 
 fun BackupSnapshot.isSafeToRestore(): Boolean =
-  isInternallyConsistent() && hasUniquePrimaryIds() && hasValidStudyRelationships() && hasValidNotebookRelationships()
+  isInternallyConsistent() && hasUniquePrimaryIds() && hasAcyclicKnowledgeHierarchy() && hasValidStudyRelationships() && hasValidNotebookRelationships()
