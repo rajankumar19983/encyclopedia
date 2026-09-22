@@ -33,7 +33,18 @@ internal data class CanvasStroke(val points:List<Offset>,val width:Float,val too
 internal fun CanvasStroke.isNear(point:Offset,radius:Float=28f):Boolean{if(points.isEmpty())return false;val r=radius+width/2;val r2=r*r;if(points.size==1)return dist2(points.first(),point)<=r2;return points.zipWithNext().any{(a,b)->segDist2(point,a,b)<=r2}}
 internal fun CanvasStroke.isInsidePolygon(polygon:List<Offset>):Boolean{if(points.isEmpty()||polygon.size<3)return false;if(points.any{pointInPolygon(it,polygon)})return true;if(points.size<2)return false;val edges=polygon.indices.map{i->polygon[i] to polygon[(i+1)%polygon.size]};return points.zipWithNext().any{segment->edges.any{edge->segmentsIntersect(segment.first,segment.second,edge.first,edge.second)}}}
 private fun pointInPolygon(p:Offset,poly:List<Offset>):Boolean{var inside=false;var j=poly.lastIndex;for(i in poly.indices){val a=poly[i];val b=poly[j];if((a.y>p.y)!=(b.y>p.y)&&p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x)inside=!inside;j=i};return inside}
-private fun segmentsIntersect(a:Offset,b:Offset,c:Offset,d:Offset):Boolean{fun cross(p:Offset,q:Offset,r:Offset)=(q.x-p.x)*(r.y-p.y)-(q.y-p.y)*(r.x-p.x);val abC=cross(a,b,c);val abD=cross(a,b,d);val cdA=cross(c,d,a);val cdB=cross(c,d,b);return (abC==0f&&onSegment(a,b,c))||(abD==0f&&onSegment(a,b,d))||(cdA==0f&&onSegment(c,d,a))||(cdB==0f&&onSegment(c,d,b))||(abC.sign!=abD.sign&&cdA.sign!=cdB.sign)}
+private fun cross(a:Offset,b:Offset,c:Offset):Float=(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x)
+private fun segmentsIntersect(a:Offset,b:Offset,c:Offset,d:Offset):Boolean{
+  val abC=cross(a,b,c)
+  val abD=cross(a,b,d)
+  val cdA=cross(c,d,a)
+  val cdB=cross(c,d,b)
+  if(abC==0f&&onSegment(a,b,c))return true
+  if(abD==0f&&onSegment(a,b,d))return true
+  if(cdA==0f&&onSegment(c,d,a))return true
+  if(cdB==0f&&onSegment(c,d,b))return true
+  return ((abC>0f)!=(abD>0f))&&((cdA>0f)!=(cdB>0f))
+}
 private fun onSegment(a:Offset,b:Offset,p:Offset)=p.x>=min(a.x,b.x)&&p.x<=max(a.x,b.x)&&p.y>=min(a.y,b.y)&&p.y<=max(a.y,b.y)
 private fun dist2(a:Offset,b:Offset):Float{val x=a.x-b.x;val y=a.y-b.y;return x*x+y*y}
 private fun segDist2(p:Offset,a:Offset,b:Offset):Float{val x=b.x-a.x;val y=b.y-a.y;val l=x*x+y*y;if(l<=.0001f)return dist2(p,a);val t=max(0f,min(1f,((p.x-a.x)*x+(p.y-a.y)*y)/l));return dist2(p,Offset(a.x+t*x,a.y+t*y))}
