@@ -30,11 +30,7 @@ import com.rajankumar.encyclopaedia.data.local.QuestionEntity
 import java.util.UUID
 import kotlinx.coroutines.launch
 
-private data class ReviewDraft(
-  val parsed: ParsedQuestionDraft,
-  val source: String,
-  val metadata: OcrSourceMetadata
-)
+private data class ReviewDraft(val parsed: ParsedQuestionDraft, val source: String, val metadata: OcrSourceMetadata)
 
 @Composable
 fun QuestionImportScreen(onDone: () -> Unit) {
@@ -51,8 +47,7 @@ fun QuestionImportScreen(onDone: () -> Unit) {
   fun review(text: String, source: String) {
     rawText = text
     val metadata = OcrSourceMetadataExtractor.extract(text)
-    val englishText = OcrLanguageFilter.removeDevanagariLines(text)
-    val parsed = OcrQuestionParser.parse(englishText)
+    val parsed = OcrQuestionParser.parse(OcrLanguageFilter.removeDevanagariLines(text))
     val summary = parsed.reviewSummary()
     drafts = parsed.map { ReviewDraft(it, source, metadata) }
     status = when {
@@ -67,23 +62,19 @@ fun QuestionImportScreen(onDone: () -> Unit) {
       busy = true
       status = "Reading printed text from image…"
       scope.launch {
-        runCatching { imageEngine.recognize(context, uri) }
-          .onSuccess { review(it, "SCAN") }
+        runCatching { imageEngine.recognize(context, uri) }.onSuccess { review(it, "SCAN") }
           .onFailure { status = "Image OCR failed: ${it.message ?: "unknown error"}" }
         busy = false
       }
     }
   }
-
   val pdfPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
     if (uri != null) {
       busy = true
       status = "Opening PDF…"
       scope.launch {
-        runCatching {
-          pdfEngine.recognize(context, uri) { page, total -> status = "Reading PDF page $page of $total…" }
-        }.onSuccess { review(it, "PDF") }
-          .onFailure { status = "PDF OCR failed: ${it.message ?: "unknown error"}" }
+        runCatching { pdfEngine.recognize(context, uri) { page, total -> status = "Reading PDF page $page of $total…" } }
+          .onSuccess { review(it, "PDF") }.onFailure { status = "PDF OCR failed: ${it.message ?: "unknown error"}" }
         busy = false
       }
     }
@@ -98,27 +89,23 @@ fun QuestionImportScreen(onDone: () -> Unit) {
       TextButton(onClick = onDone) { Text("Back") }
     }
     Text(status)
-
-    if (drafts.isEmpty() && rawText.isNotBlank()) {
-      Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
-          Text("OCR text for diagnosis", style = MaterialTheme.typography.titleMedium)
-          Text(OcrLanguageFilter.removeDevanagariLines(rawText).take(2500), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+    if (drafts.isEmpty() && rawText.isNotBlank()) Card(Modifier.fillMaxWidth()) {
+      Column(Modifier.padding(16.dp)) {
+        Text("OCR text for diagnosis", style = MaterialTheme.typography.titleMedium)
+        Text(OcrLanguageFilter.removeDevanagariLines(rawText).take(2500), color = MaterialTheme.colorScheme.onSurfaceVariant)
       }
     }
-
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
       itemsIndexed(drafts) { index, initial ->
         var question by remember(initial) { mutableStateOf(initial.parsed.questionText) }
         var optionsText by remember(initial) { mutableStateOf(initial.parsed.options.joinToString("\n")) }
         var answer by remember(initial) { mutableStateOf(initial.parsed.correctAnswer.orEmpty()) }
         var saveState by remember(initial) { mutableStateOf("READY") }
-        val options = optionsText.lines().map { it.trim() }.filter { it.isNotBlank() }
-        val answerIndex = answer.toIntOrNull()?.minus(1) ?: answer.uppercase().singleOrNull()?.let { it.code - 'A'.code }
-        val valid = question.isNotBlank() && options.size >= 2 && answerIndex != null && answerIndex in options.indices
+        val editable = EditableImportDraft(question, optionsText.lines(), answer)
+        val options = editable.cleanedOptions
+        val normalizedAnswer = normalizedImportedAnswer(answer, options.size)
+        val valid = editable.isValid()
         val metadataLabel = listOfNotNull(initial.metadata.examName, initial.metadata.year?.toString()).joinToString(" • ")
-
         Card(Modifier.fillMaxWidth()) {
           Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Draft ${index + 1} • ${initial.source}${if (metadataLabel.isBlank()) "" else " • $metadataLabel"}", style = MaterialTheme.typography.titleMedium)
@@ -131,23 +118,14 @@ fun QuestionImportScreen(onDone: () -> Unit) {
               Button(enabled = valid && saveState == "READY", onClick = {
                 saveState = "SAVING"
                 scope.launch {
-                  val normalizedAnswer = ('A'.code + (answerIndex ?: 0)).toChar().toString()
-                  val inserted = dao.saveImportedQuestionIfUnique(
-                    QuestionEntity(
-                      id = UUID.randomUUID().toString(),
-                      questionText = question.trim(),
-                      options = options.joinToString("\n"),
-                      correctAnswer = normalizedAnswer,
-                      explanation = initial.parsed.explanation,
-                      source = initial.source,
-                      difficulty = "UNRATED"
-                    ), null
-                  )
+                  val inserted = dao.saveImportedQuestionIfUnique(QuestionEntity(
+                    id = UUID.randomUUID().toString(), questionText = question.trim(), options = options.joinToString("\n"),
+                    correctAnswer = normalizedAnswer.orEmpty(), explanation = initial.parsed.explanation,
+                    source = initial.source, difficulty = "UNRATED"
+                  ), null)
                   saveState = if (inserted) "SAVED" else "DUPLICATE"
                 }
-              }) {
-                Text(when (saveState) { "SAVING" -> "Checking…"; "SAVED" -> "Saved"; "DUPLICATE" -> "Already exists"; else -> "Approve & Save" })
-              }
+              }) { Text(when (saveState) { "SAVING" -> "Checking…"; "SAVED" -> "Saved"; "DUPLICATE" -> "Already exists"; else -> "Approve & Save" }) }
               TextButton(onClick = { drafts = drafts.filterIndexed { i, _ -> i != index } }) { Text("Reject") }
             }
             when {
