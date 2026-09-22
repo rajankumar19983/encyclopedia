@@ -39,7 +39,49 @@ class TopicRevisionTest {
 
     assertEquals(setOf("os", "sched"), states.map { it.topic.id }.toSet())
     assertTrue(states.all { it.questionsNeedingRevision == 1 })
+    assertTrue(states.all { it.revisionQuestionIds == listOf("q1") })
     assertTrue(states.all { it.mistakes == 1 })
+  }
+
+  @Test
+  fun topicRevisionContainsOnlyQuestionsStillDue() {
+    val state = buildTopicRevisionStates(
+      topics = listOf(scheduling),
+      questionTopics = listOf(
+        QuestionTopicEntity("q1", "sched"),
+        QuestionTopicEntity("q2", "sched"),
+        QuestionTopicEntity("q3", "sched"),
+      ),
+      attempts = listOf(
+        attempt("a1", "q1", false, 1),
+        attempt("a2", "q2", false, 2),
+        attempt("a3", "q2", true, 3),
+        attempt("a4", "q2", true, 4),
+        attempt("a5", "q3", true, 5),
+      ),
+    ).single()
+
+    assertEquals(listOf("q1"), state.revisionQuestionIds)
+    assertEquals(1, state.questionsNeedingRevision)
+  }
+
+  @Test
+  fun dueQuestionIdsAreStableAndDeduplicated() {
+    val state = buildTopicRevisionStates(
+      topics = listOf(scheduling),
+      questionTopics = listOf(
+        QuestionTopicEntity("q2", "sched"),
+        QuestionTopicEntity("q1", "sched"),
+        QuestionTopicEntity("q1", "sched"),
+      ),
+      attempts = listOf(
+        attempt("a1", "q2", false, 1),
+        attempt("a2", "q1", false, 2),
+      ),
+    ).single()
+
+    assertEquals(listOf("q1", "q2"), state.revisionQuestionIds)
+    assertEquals(2, state.questionsNeedingRevision)
   }
 
   @Test
@@ -70,6 +112,7 @@ class TopicRevisionTest {
 
     assertEquals(1, states.size)
     assertEquals(1, states.single().questionsNeedingRevision)
+    assertEquals(listOf("q1"), states.single().revisionQuestionIds)
     assertEquals(50, states.single().accuracyPercent)
   }
 
