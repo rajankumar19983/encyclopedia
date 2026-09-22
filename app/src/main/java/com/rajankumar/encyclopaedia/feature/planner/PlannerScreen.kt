@@ -50,6 +50,9 @@ fun PlannerScreen() {
   val todaySummary = tasks.plannerTodaySummary()
   val carryWarning = tasks.plannerCarryWarning()
   val capacity = tasks.plannerCapacity()
+  val recommendation = tasks.dailyPlannerRecommendation()
+  val priorities = tasks.plannerPriorities()
+  val nextAction = tasks.plannerNextAction()
   var title by remember { mutableStateOf("") }
   var showHistory by remember { mutableStateOf(false) }
   var editingTaskId by remember { mutableStateOf<String?>(null) }
@@ -105,6 +108,24 @@ fun PlannerScreen() {
           Text(todaySummary.supportingText(), color = MaterialTheme.colorScheme.onSurfaceVariant)
           carryWarning?.let { Text(it.message, style = MaterialTheme.typography.bodySmall) }
           Text(capacity.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+      }
+    }
+    item {
+      Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+          Text(recommendation.title, style = MaterialTheme.typography.titleMedium)
+          Text(recommendation.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          nextAction?.let {
+            Text("Next: ${it.title}", style = MaterialTheme.typography.bodyLarge)
+            Text(it.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          }
+          if (priorities.size > 1) {
+            Text("Up next", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
+            priorities.drop(1).forEach { priority ->
+              Text("${priority.rank}. ${priority.task.title} • ${priority.reason}", style = MaterialTheme.typography.bodySmall)
+            }
+          }
         }
       }
     }
