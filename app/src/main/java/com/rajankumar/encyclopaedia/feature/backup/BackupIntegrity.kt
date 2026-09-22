@@ -1,5 +1,18 @@
 package com.rajankumar.encyclopaedia.feature.backup
 
+private fun List<String>.allUnique(): Boolean = size == toSet().size
+
+fun BackupSnapshot.hasUniquePrimaryIds(): Boolean =
+  knowledgeNodes.map { it.id }.allUnique() &&
+    lessons.map { it.id }.allUnique() &&
+    questions.map { it.id }.allUnique() &&
+    attempts.map { it.id }.allUnique() &&
+    plannerTasks.map { it.id }.allUnique() &&
+    notebookPages.map { it.id }.allUnique() &&
+    notebookLayers.map { it.id }.allUnique() &&
+    notebookStrokes.map { it.id }.allUnique() &&
+    questionTopics.map { it.questionId to it.knowledgeNodeId }.let { it.size == it.toSet().size }
+
 fun BackupSnapshot.hasValidStudyRelationships(): Boolean {
   val nodeIds = knowledgeNodes.map { it.id }.toSet()
   val questionIds = questions.map { it.id }.toSet()
@@ -21,4 +34,4 @@ fun BackupSnapshot.hasValidNotebookRelationships(): Boolean {
 }
 
 fun BackupSnapshot.isSafeToRestore(): Boolean =
-  isInternallyConsistent() && hasValidStudyRelationships() && hasValidNotebookRelationships()
+  isInternallyConsistent() && hasUniquePrimaryIds() && hasValidStudyRelationships() && hasValidNotebookRelationships()
