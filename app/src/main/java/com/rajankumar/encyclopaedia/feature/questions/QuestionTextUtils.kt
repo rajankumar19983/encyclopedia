@@ -6,7 +6,6 @@ fun QuestionEntity.optionList(): List<String> = options
   .lines()
   .map(String::trim)
   .filter(String::isNotBlank)
-  .take(6)
 
 fun optionLetter(index: Int): String = ('A'.code + index).toChar().toString()
 
