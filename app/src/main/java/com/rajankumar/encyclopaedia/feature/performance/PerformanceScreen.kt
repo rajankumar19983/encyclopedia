@@ -40,6 +40,7 @@ fun PerformanceScreen() {
   val topicCoverage = remember(topics, data.topicPerformance) { performanceCoverage(topics.size, data.topicPerformance) }
   val topicPriorities = remember(data.topicPerformance) { data.topicPerformance.studyPriorities() }
   val topicInsight = remember(topicCoverage, topicPriorities) { topicPerformanceInsight(topicCoverage, topicPriorities) }
+  val consistencyFeedback = remember(data.consistency) { studyConsistencyFeedback(data.consistency) }
 
   LazyColumn(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
     item { Text("Performance", style = MaterialTheme.typography.headlineMedium) }
@@ -53,6 +54,9 @@ fun PerformanceScreen() {
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         summary.stats().forEach { stat -> Card(Modifier.weight(1f)) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) { Text(stat.label, style = MaterialTheme.typography.labelLarge); Text(stat.value, style = MaterialTheme.typography.headlineSmall); Text(stat.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } } }
       }
+    }
+    item {
+      Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) { Text("Study consistency", style = MaterialTheme.typography.titleMedium); Text(consistencyFeedback.headline, style = MaterialTheme.typography.titleSmall); Text("${data.consistency.activeDays} active days • current streak ${data.consistency.currentStreak} • longest ${data.consistency.longestStreak}"); Text(consistencyFeedback.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
     }
     item {
       Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { Text("Question coverage", style = MaterialTheme.typography.titleMedium); LinearProgressIndicator(progress = { summary.coverage / 100f }, modifier = Modifier.fillMaxWidth()); Text("${summary.uniqueQuestions} of ${summary.totalQuestions} questions practised") } }
@@ -77,9 +81,7 @@ fun PerformanceScreen() {
       }
       if (topicPriorities.isNotEmpty()) {
         item { Text("Study priorities", style = MaterialTheme.typography.titleLarge) }
-        items(topicPriorities, key = { "priority-${it.performance.topic.id}" }) { priority ->
-          Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) { Text(priority.performance.topic.name, style = MaterialTheme.typography.titleMedium); LinearProgressIndicator(progress = { priority.performance.accuracyPercent / 100f }, modifier = Modifier.fillMaxWidth()); Text("${priority.performance.accuracyPercent}% accuracy • ${priority.performance.mistakes} mistakes • ${priority.reason}") } }
-        }
+        items(topicPriorities, key = { "priority-${it.performance.topic.id}" }) { priority -> Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) { Text(priority.performance.topic.name, style = MaterialTheme.typography.titleMedium); LinearProgressIndicator(progress = { priority.performance.accuracyPercent / 100f }, modifier = Modifier.fillMaxWidth()); Text("${priority.performance.accuracyPercent}% accuracy • ${priority.performance.mistakes} mistakes • ${priority.reason}") } } }
       }
       if (data.topicsNeedingRevision.isNotEmpty()) {
         item { Text("Topic revision", style = MaterialTheme.typography.titleLarge) }
