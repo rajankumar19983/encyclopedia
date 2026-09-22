@@ -41,10 +41,11 @@ internal data class CanvasStroke(val points:List<Offset>,val width:Float,val too
   fun scaledPoint(p:Offset,c:Offset,scale:Float)=Offset(c.x+(p.x-c.x)*scale,c.y+(p.y-c.y)*scale)
   fun centroid(e:MotionEvent):Offset{var x=0f;var y=0f;for(i in 0 until e.pointerCount){x+=e.getX(i);y+=e.getY(i)};return Offset(x/e.pointerCount,y/e.pointerCount)}
   fun pointerDistance(e:MotionEvent):Float{if(e.pointerCount<2)return 1f;return hypot(e.getX(1)-e.getX(0),e.getY(1)-e.getY(0)).coerceAtLeast(1f)}
+  fun pointerToolTypes(e:MotionEvent)=List(e.pointerCount){i->runCatching{e.getToolType(i)}.getOrDefault(MotionEvent.TOOL_TYPE_UNKNOWN)}
   fun cancelDrawing(){activePoints=emptyList();accepting=false;pointerId=-1;draggingSelection=false;resizingSelection=false;dragOffset=Offset.Zero;previewScale=1f}
 
   Canvas(modifier.pointerInteropFilter{e->
-    if(e.actionMasked==MotionEvent.ACTION_POINTER_DOWN&&e.pointerCount>=2){
+    if(e.actionMasked==MotionEvent.ACTION_POINTER_DOWN&&NotebookInputPolicy.shouldStartViewportGesture(palmRejection,pointerToolTypes(e))){
       cancelDrawing()
       viewportGesture=true
       gestureStartViewport=viewport
@@ -65,9 +66,8 @@ internal data class CanvasStroke(val points:List<Offset>,val width:Float,val too
     }
     val ai=e.actionIndex.coerceAtLeast(0)
     val hw=runCatching{e.getToolType(ai)}.getOrDefault(MotionEvent.TOOL_TYPE_UNKNOWN)
-    val stylus=hw==MotionEvent.TOOL_TYPE_STYLUS||hw==MotionEvent.TOOL_TYPE_ERASER
     when(e.actionMasked){
-      MotionEvent.ACTION_DOWN,MotionEvent.ACTION_POINTER_DOWN->if(!accepting&&(!palmRejection||stylus)){
+      MotionEvent.ACTION_DOWN,MotionEvent.ACTION_POINTER_DOWN->if(!accepting&&NotebookInputPolicy.canStartStroke(palmRejection,hw)){
         accepting=true
         pointerId=e.getPointerId(ai)
         eventTool=if(hw==MotionEvent.TOOL_TYPE_ERASER)NotebookTool.ERASER else selectedTool
