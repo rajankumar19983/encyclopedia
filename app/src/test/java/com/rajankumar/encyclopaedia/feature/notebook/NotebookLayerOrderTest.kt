@@ -37,4 +37,24 @@ class NotebookLayerOrderTest {
     assertEquals("c", s.secondId)
     assertEquals(90, s.secondOrder)
   }
+
+  @Test fun duplicateSortOrders_followDatabaseCreatedAtOrdering(){
+    val tied = listOf(
+      NotebookLayerEntity(id="late",pageId="page",name="Late",sortOrder=0,createdAt=300),
+      NotebookLayerEntity(id="early",pageId="page",name="Early",sortOrder=0,createdAt=100),
+      NotebookLayerEntity(id="middle",pageId="page",name="Middle",sortOrder=0,createdAt=200)
+    )
+    val s = layerOrderSwap(tied, "middle", -1)!!
+    assertEquals("middle", s.firstId)
+    assertEquals("early", s.secondId)
+  }
+
+  @Test fun identicalOrderAndTimestamp_useStableIdTieBreaker(){
+    val tied = listOf(
+      NotebookLayerEntity(id="b",pageId="page",name="B",sortOrder=0,createdAt=100),
+      NotebookLayerEntity(id="a",pageId="page",name="A",sortOrder=0,createdAt=100)
+    )
+    val s = layerOrderSwap(tied, "b", -1)!!
+    assertEquals("a", s.secondId)
+  }
 }
