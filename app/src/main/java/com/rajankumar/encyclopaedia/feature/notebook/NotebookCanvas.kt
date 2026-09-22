@@ -8,6 +8,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import kotlin.math.*
 
@@ -16,29 +17,163 @@ internal enum class NotebookBackground { PLAIN, LINED, GRID }
 internal data class CanvasStroke(val points:List<Offset>,val width:Float,val tool:NotebookTool=NotebookTool.PEN,val colorArgb:Long=0xFF111111)
 
 @Composable internal fun NotebookCanvas(strokes:List<CanvasStroke>,palmRejection:Boolean,selectedTool:NotebookTool,penWidth:Float,penColorArgb:Long,background:NotebookBackground,onStrokeFinished:(CanvasStroke)->Unit,onEraseAt:(Offset)->Unit,onLassoFinished:(List<Offset>)->Unit={},selectedStrokes:List<CanvasStroke> = emptyList(),onSelectionMoved:(Offset)->Unit={},onSelectionScaled:(Float)->Unit={},modifier:Modifier=Modifier){
-  var activePoints by remember{mutableStateOf<List<Offset>>(emptyList())};var activeWidth by remember{mutableStateOf(penWidth)};var accepting by remember{mutableStateOf(false)};var pointerId by remember{mutableStateOf(-1)};var eventTool by remember{mutableStateOf(selectedTool)};var draggingSelection by remember{mutableStateOf(false)};var resizingSelection by remember{mutableStateOf(false)};var dragStart by remember{mutableStateOf(Offset.Zero)};var dragOffset by remember{mutableStateOf(Offset.Zero)};var previewScale by remember{mutableStateOf(1f)}
+  var activePoints by remember{mutableStateOf<List<Offset>>(emptyList())}
+  var activeWidth by remember{mutableStateOf(penWidth)}
+  var accepting by remember{mutableStateOf(false)}
+  var pointerId by remember{mutableStateOf(-1)}
+  var eventTool by remember{mutableStateOf(selectedTool)}
+  var draggingSelection by remember{mutableStateOf(false)}
+  var resizingSelection by remember{mutableStateOf(false)}
+  var dragStart by remember{mutableStateOf(Offset.Zero)}
+  var dragOffset by remember{mutableStateOf(Offset.Zero)}
+  var previewScale by remember{mutableStateOf(1f)}
+  var viewport by remember{mutableStateOf(NotebookViewport())}
+  var viewportGesture by remember{mutableStateOf(false)}
+  var gestureStartViewport by remember{mutableStateOf(NotebookViewport())}
+  var gestureStartCentroid by remember{mutableStateOf(Offset.Zero)}
+  var gestureStartDistance by remember{mutableStateOf(1f)}
+
   fun append(p:Offset){val l=activePoints.lastOrNull();if(l==null||abs(l.x-p.x)>=.5f||abs(l.y-p.y)>=.5f)activePoints=activePoints+p}
-  fun history(e:MotionEvent,i:Int){for(h in 0 until e.historySize)append(Offset(e.getHistoricalX(i,h),e.getHistoricalY(i,h)))}
+  fun worldPoint(x:Float,y:Float)=viewport.screenToWorld(Offset(x,y))
+  fun history(e:MotionEvent,i:Int){for(h in 0 until e.historySize)append(worldPoint(e.getHistoricalX(i,h),e.getHistoricalY(i,h)))}
   fun bounds():FloatArray?{val pts=selectedStrokes.flatMap{it.points};if(pts.isEmpty())return null;return floatArrayOf(pts.minOf{it.x}-20f,pts.minOf{it.y}-20f,pts.maxOf{it.x}+20f,pts.maxOf{it.y}+20f)}
   fun center(b:FloatArray)=Offset((b[0]+b[2])/2f,(b[1]+b[3])/2f)
   fun scaledPoint(p:Offset,c:Offset,scale:Float)=Offset(c.x+(p.x-c.x)*scale,c.y+(p.y-c.y)*scale)
-  Canvas(modifier.pointerInteropFilter{e->val ai=e.actionIndex.coerceAtLeast(0);val hw=runCatching{e.getToolType(ai)}.getOrDefault(MotionEvent.TOOL_TYPE_UNKNOWN);val stylus=hw==MotionEvent.TOOL_TYPE_STYLUS||hw==MotionEvent.TOOL_TYPE_ERASER;when(e.actionMasked){MotionEvent.ACTION_DOWN,MotionEvent.ACTION_POINTER_DOWN->if(!accepting&&(!palmRejection||stylus)){accepting=true;pointerId=e.getPointerId(ai);eventTool=if(hw==MotionEvent.TOOL_TYPE_ERASER)NotebookTool.ERASER else selectedTool;val p=Offset(e.getX(ai),e.getY(ai));val b=if(eventTool==NotebookTool.LASSO)bounds() else null;val handle=if(b!=null)Offset(b[2],b[3]) else null;if(handle!=null&&hypot(p.x-handle.x,p.y-handle.y)<=36f){resizingSelection=true;draggingSelection=false;dragStart=p;previewScale=1f;activePoints=emptyList()}else if(b!=null&&p.x in b[0]..b[2]&&p.y in b[1]..b[3]){draggingSelection=true;resizingSelection=false;dragStart=p;dragOffset=Offset.Zero;activePoints=emptyList()}else if(eventTool==NotebookTool.ERASER)onEraseAt(p)else{draggingSelection=false;resizingSelection=false;activePoints=listOf(p);val pressure=e.getPressure(ai).coerceIn(.1f,1f);activeWidth=if(eventTool==NotebookTool.HIGHLIGHTER)penWidth*4f else penWidth*(.65f+pressure*.7f)}};MotionEvent.ACTION_MOVE->if(accepting){val i=e.findPointerIndex(pointerId);if(i>=0){val p=Offset(e.getX(i),e.getY(i));if(resizingSelection){val b=bounds();if(b!=null){val c=center(b);val startDistance=hypot(dragStart.x-c.x,dragStart.y-c.y).coerceAtLeast(1f);previewScale=(hypot(p.x-c.x,p.y-c.y)/startDistance).coerceIn(.25f,4f)}}else if(draggingSelection)dragOffset=p-dragStart else if(eventTool==NotebookTool.ERASER){for(h in 0 until e.historySize)onEraseAt(Offset(e.getHistoricalX(i,h),e.getHistoricalY(i,h)));onEraseAt(p)}else{history(e,i);append(p)}}};MotionEvent.ACTION_UP,MotionEvent.ACTION_POINTER_UP->if(accepting&&e.getPointerId(ai)==pointerId){when{resizingSelection->{if(abs(previewScale-1f)>.01f)onSelectionScaled(previewScale);resizingSelection=false;previewScale=1f};draggingSelection->{if(dragOffset!=Offset.Zero)onSelectionMoved(dragOffset);draggingSelection=false;dragOffset=Offset.Zero};eventTool==NotebookTool.LASSO&&activePoints.size>=3->onLassoFinished(activePoints);eventTool!=NotebookTool.ERASER&&activePoints.isNotEmpty()->onStrokeFinished(CanvasStroke(activePoints,activeWidth,eventTool,penColorArgb))};activePoints=emptyList();accepting=false;pointerId=-1};MotionEvent.ACTION_CANCEL->{activePoints=emptyList();accepting=false;pointerId=-1;draggingSelection=false;resizingSelection=false;dragOffset=Offset.Zero;previewScale=1f}};accepting}){
-    drawRect(Color.White);val guide=Color(0xFFE1E5EA);val spacing=48f;if(background==NotebookBackground.LINED||background==NotebookBackground.GRID){var y=spacing;while(y<size.height){drawLine(guide,Offset(0f,y),Offset(size.width,y),1f);y+=spacing}};if(background==NotebookBackground.GRID){var x=spacing;while(x<size.width){drawLine(guide,Offset(x,0f),Offset(x,size.height),1f);x+=spacing}}
-    val b=bounds();val c=b?.let(::center)
-    fun previewPoint(p:Offset):Offset{val q=if(c!=null)scaledPoint(p,c,previewScale)else p;return q+dragOffset}
-    fun drawS(s:CanvasStroke,preview:Boolean=false){if(s.points.isEmpty()||s.tool==NotebookTool.ERASER||s.tool==NotebookTool.LASSO)return;val base=Color(s.colorArgb.toULong());val color=if(s.tool==NotebookTool.HIGHLIGHTER)base.copy(alpha=.32f)else base;val pts=if(preview)s.points.map(::previewPoint)else s.points;val width=s.width*(if(preview)previewScale else 1f);if(pts.size==1){drawCircle(color,width/2f,pts.first());return};val p=Path().apply{moveTo(pts.first().x,pts.first().y);if(pts.size==2)lineTo(pts[1].x,pts[1].y)else{for(i in 1 until pts.lastIndex){val x=pts[i];val n=pts[i+1];quadraticBezierTo(x.x,x.y,(x.x+n.x)/2,(x.y+n.y)/2)};lineTo(pts.last().x,pts.last().y)}};drawPath(p,color,style=Stroke(width,cap=StrokeCap.Round,join=StrokeJoin.Round))}
-    val selectedSet=selectedStrokes.toSet();strokes.filter{it !in selectedSet}.forEach{drawS(it)};selectedStrokes.forEach{drawS(it,true)};if(b!=null&&c!=null){val tl=previewPoint(Offset(b[0],b[1]));val br=previewPoint(Offset(b[2],b[3]));drawRect(Color(0xFF2563EB),topLeft=Offset(min(tl.x,br.x),min(tl.y,br.y)),size=Size(abs(br.x-tl.x),abs(br.y-tl.y)),style=Stroke(2f,pathEffect=PathEffect.dashPathEffect(floatArrayOf(10f,8f))));drawCircle(Color(0xFF2563EB),10f,br);drawCircle(Color.White,5f,br)};if(eventTool==NotebookTool.LASSO&&!draggingSelection&&!resizingSelection&&activePoints.size>1){val p=Path().apply{moveTo(activePoints.first().x,activePoints.first().y);activePoints.drop(1).forEach{lineTo(it.x,it.y)}};drawPath(p,Color(0xFF2563EB),style=Stroke(2f,pathEffect=PathEffect.dashPathEffect(floatArrayOf(10f,8f))))}else if(eventTool!=NotebookTool.ERASER&&!draggingSelection&&!resizingSelection)drawS(CanvasStroke(activePoints,activeWidth,eventTool,penColorArgb))
+  fun centroid(e:MotionEvent):Offset{var x=0f;var y=0f;for(i in 0 until e.pointerCount){x+=e.getX(i);y+=e.getY(i)};return Offset(x/e.pointerCount,y/e.pointerCount)}
+  fun pointerDistance(e:MotionEvent):Float{if(e.pointerCount<2)return 1f;return hypot(e.getX(1)-e.getX(0),e.getY(1)-e.getY(0)).coerceAtLeast(1f)}
+  fun cancelDrawing(){activePoints=emptyList();accepting=false;pointerId=-1;draggingSelection=false;resizingSelection=false;dragOffset=Offset.Zero;previewScale=1f}
+
+  Canvas(modifier.pointerInteropFilter{e->
+    if(e.actionMasked==MotionEvent.ACTION_POINTER_DOWN&&e.pointerCount>=2){
+      cancelDrawing()
+      viewportGesture=true
+      gestureStartViewport=viewport
+      gestureStartCentroid=centroid(e)
+      gestureStartDistance=pointerDistance(e)
+      return@pointerInteropFilter true
+    }
+    if(viewportGesture){
+      when(e.actionMasked){
+        MotionEvent.ACTION_MOVE->if(e.pointerCount>=2){
+          val currentCentroid=centroid(e)
+          val factor=pointerDistance(e)/gestureStartDistance
+          viewport=gestureStartViewport.zoomAt(gestureStartCentroid,factor).panBy(currentCentroid-gestureStartCentroid)
+        }
+        MotionEvent.ACTION_POINTER_UP,MotionEvent.ACTION_UP,MotionEvent.ACTION_CANCEL->viewportGesture=false
+      }
+      return@pointerInteropFilter true
+    }
+    val ai=e.actionIndex.coerceAtLeast(0)
+    val hw=runCatching{e.getToolType(ai)}.getOrDefault(MotionEvent.TOOL_TYPE_UNKNOWN)
+    val stylus=hw==MotionEvent.TOOL_TYPE_STYLUS||hw==MotionEvent.TOOL_TYPE_ERASER
+    when(e.actionMasked){
+      MotionEvent.ACTION_DOWN,MotionEvent.ACTION_POINTER_DOWN->if(!accepting&&(!palmRejection||stylus)){
+        accepting=true
+        pointerId=e.getPointerId(ai)
+        eventTool=if(hw==MotionEvent.TOOL_TYPE_ERASER)NotebookTool.ERASER else selectedTool
+        val p=worldPoint(e.getX(ai),e.getY(ai))
+        val b=if(eventTool==NotebookTool.LASSO)bounds() else null
+        val handle=if(b!=null)Offset(b[2],b[3]) else null
+        val handleRadius=36f/viewport.scale
+        if(handle!=null&&hypot(p.x-handle.x,p.y-handle.y)<=handleRadius){
+          resizingSelection=true;draggingSelection=false;dragStart=p;previewScale=1f;activePoints=emptyList()
+        }else if(b!=null&&p.x in b[0]..b[2]&&p.y in b[1]..b[3]){
+          draggingSelection=true;resizingSelection=false;dragStart=p;dragOffset=Offset.Zero;activePoints=emptyList()
+        }else if(eventTool==NotebookTool.ERASER)onEraseAt(p)
+        else{
+          draggingSelection=false;resizingSelection=false;activePoints=listOf(p)
+          val pressure=e.getPressure(ai).coerceIn(.1f,1f)
+          activeWidth=if(eventTool==NotebookTool.HIGHLIGHTER)penWidth*4f else penWidth*(.65f+pressure*.7f)
+        }
+      }
+      MotionEvent.ACTION_MOVE->if(accepting){
+        val i=e.findPointerIndex(pointerId)
+        if(i>=0){
+          val p=worldPoint(e.getX(i),e.getY(i))
+          if(resizingSelection){
+            val b=bounds()
+            if(b!=null){
+              val c=center(b)
+              val startDistance=hypot(dragStart.x-c.x,dragStart.y-c.y).coerceAtLeast(1f)
+              previewScale=(hypot(p.x-c.x,p.y-c.y)/startDistance).coerceIn(.25f,4f)
+            }
+          }else if(draggingSelection)dragOffset=p-dragStart
+          else if(eventTool==NotebookTool.ERASER){
+            for(h in 0 until e.historySize)onEraseAt(worldPoint(e.getHistoricalX(i,h),e.getHistoricalY(i,h)))
+            onEraseAt(p)
+          }else{history(e,i);append(p)}
+        }
+      }
+      MotionEvent.ACTION_UP,MotionEvent.ACTION_POINTER_UP->if(accepting&&e.getPointerId(ai)==pointerId){
+        when{
+          resizingSelection->{if(abs(previewScale-1f)>.01f)onSelectionScaled(previewScale);resizingSelection=false;previewScale=1f}
+          draggingSelection->{if(dragOffset!=Offset.Zero)onSelectionMoved(dragOffset);draggingSelection=false;dragOffset=Offset.Zero}
+          eventTool==NotebookTool.LASSO&&activePoints.size>=3->onLassoFinished(activePoints)
+          eventTool!=NotebookTool.ERASER&&activePoints.isNotEmpty()->onStrokeFinished(CanvasStroke(activePoints,activeWidth,eventTool,penColorArgb))
+        }
+        activePoints=emptyList();accepting=false;pointerId=-1
+      }
+      MotionEvent.ACTION_CANCEL->cancelDrawing()
+    }
+    accepting
+  }){
+    drawRect(Color.White)
+    withTransform({translate(viewport.offset.x,viewport.offset.y);scale(viewport.scale,viewport.scale,pivot=Offset.Zero)}){
+      val guide=Color(0xFFE1E5EA)
+      val spacing=48f
+      val worldLeft=-viewport.offset.x/viewport.scale
+      val worldTop=-viewport.offset.y/viewport.scale
+      val worldRight=worldLeft+size.width/viewport.scale
+      val worldBottom=worldTop+size.height/viewport.scale
+      if(background==NotebookBackground.LINED||background==NotebookBackground.GRID){
+        var y=floor(worldTop/spacing)*spacing
+        while(y<=worldBottom){drawLine(guide,Offset(worldLeft,y),Offset(worldRight,y),1f);y+=spacing}
+      }
+      if(background==NotebookBackground.GRID){
+        var x=floor(worldLeft/spacing)*spacing
+        while(x<=worldRight){drawLine(guide,Offset(x,worldTop),Offset(x,worldBottom),1f);x+=spacing}
+      }
+      val b=bounds();val c=b?.let(::center)
+      fun previewPoint(p:Offset):Offset{val q=if(c!=null)scaledPoint(p,c,previewScale)else p;return q+dragOffset}
+      fun drawS(s:CanvasStroke,preview:Boolean=false){
+        if(s.points.isEmpty()||s.tool==NotebookTool.ERASER||s.tool==NotebookTool.LASSO)return
+        val base=Color(s.colorArgb.toULong())
+        val color=if(s.tool==NotebookTool.HIGHLIGHTER)base.copy(alpha=.32f)else base
+        val pts=if(preview)s.points.map(::previewPoint)else s.points
+        val width=s.width*(if(preview)previewScale else 1f)
+        if(pts.size==1){drawCircle(color,width/2f,pts.first());return}
+        val p=Path().apply{
+          moveTo(pts.first().x,pts.first().y)
+          if(pts.size==2)lineTo(pts[1].x,pts[1].y)
+          else{
+            for(i in 1 until pts.lastIndex){val x=pts[i];val n=pts[i+1];quadraticBezierTo(x.x,x.y,(x.x+n.x)/2,(x.y+n.y)/2)}
+            lineTo(pts.last().x,pts.last().y)
+          }
+        }
+        drawPath(p,color,style=Stroke(width,cap=StrokeCap.Round,join=StrokeJoin.Round))
+      }
+      val selectedSet=selectedStrokes.toSet()
+      strokes.filter{it !in selectedSet}.forEach{drawS(it)}
+      selectedStrokes.forEach{drawS(it,true)}
+      if(b!=null&&c!=null){
+        val tl=previewPoint(Offset(b[0],b[1]));val br=previewPoint(Offset(b[2],b[3]))
+        drawRect(Color(0xFF2563EB),topLeft=Offset(min(tl.x,br.x),min(tl.y,br.y)),size=Size(abs(br.x-tl.x),abs(br.y-tl.y)),style=Stroke(2f/viewport.scale,pathEffect=PathEffect.dashPathEffect(floatArrayOf(10f/viewport.scale,8f/viewport.scale))))
+        drawCircle(Color(0xFF2563EB),10f/viewport.scale,br);drawCircle(Color.White,5f/viewport.scale,br)
+      }
+      if(eventTool==NotebookTool.LASSO&&!draggingSelection&&!resizingSelection&&activePoints.size>1){
+        val p=Path().apply{moveTo(activePoints.first().x,activePoints.first().y);activePoints.drop(1).forEach{lineTo(it.x,it.y)}}
+        drawPath(p,Color(0xFF2563EB),style=Stroke(2f/viewport.scale,pathEffect=PathEffect.dashPathEffect(floatArrayOf(10f/viewport.scale,8f/viewport.scale))))
+      }else if(eventTool!=NotebookTool.ERASER&&!draggingSelection&&!resizingSelection)drawS(CanvasStroke(activePoints,activeWidth,eventTool,penColorArgb))
+    }
   }
 }
+
 internal fun CanvasStroke.isNear(point:Offset,radius:Float=28f):Boolean{if(points.isEmpty())return false;val r=radius+width/2;val r2=r*r;if(points.size==1)return dist2(points.first(),point)<=r2;return points.zipWithNext().any{(a,b)->segDist2(point,a,b)<=r2}}
 internal fun CanvasStroke.isInsidePolygon(polygon:List<Offset>):Boolean{if(points.isEmpty()||polygon.size<3)return false;if(points.any{pointInPolygon(it,polygon)})return true;if(points.size<2)return false;val edges=polygon.indices.map{i->polygon[i] to polygon[(i+1)%polygon.size]};return points.zipWithNext().any{segment->edges.any{edge->segmentsIntersect(segment.first,segment.second,edge.first,edge.second)}}}
 private fun pointInPolygon(p:Offset,poly:List<Offset>):Boolean{var inside=false;var j=poly.lastIndex;for(i in poly.indices){val a=poly[i];val b=poly[j];if((a.y>p.y)!=(b.y>p.y)&&p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x)inside=!inside;j=i};return inside}
 private fun cross(a:Offset,b:Offset,c:Offset):Float=(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x)
 private fun segmentsIntersect(a:Offset,b:Offset,c:Offset,d:Offset):Boolean{
-  val abC=cross(a,b,c)
-  val abD=cross(a,b,d)
-  val cdA=cross(c,d,a)
-  val cdB=cross(c,d,b)
+  val abC=cross(a,b,c);val abD=cross(a,b,d);val cdA=cross(c,d,a);val cdB=cross(c,d,b)
   if(abC==0f&&onSegment(a,b,c))return true
   if(abD==0f&&onSegment(a,b,d))return true
   if(cdA==0f&&onSegment(c,d,a))return true
