@@ -30,11 +30,15 @@ fun PerformanceScreen() {
   val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
   val questions by dao.observeQuestions().collectAsStateWithLifecycle(emptyList())
   val attempts by dao.observeAllAttempts().collectAsStateWithLifecycle(emptyList())
+  val topics by dao.observeAllNodes().collectAsStateWithLifecycle(emptyList())
+  val questionTopics by dao.observeQuestionTopics().collectAsStateWithLifecycle(emptyList())
   var dashboardState by remember { mutableStateOf(PerformanceDashboardState()) }
   val filteredAttempts = remember(attempts, dashboardState.period) {
     attempts.withinPeriod(dashboardState.period)
   }
-  val data = remember(questions, filteredAttempts) { buildPerformanceData(questions, filteredAttempts) }
+  val data = remember(questions, filteredAttempts, topics, questionTopics) {
+    buildPerformanceData(questions, filteredAttempts, topics, questionTopics)
+  }
   val visibleWeakQuestions = remember(data, dashboardState.weakQuestionQuery, dashboardState.weakQuestionSort) {
     data.visibleWeakQuestions(dashboardState)
   }
@@ -79,6 +83,42 @@ fun PerformanceScreen() {
     if (filteredAttempts.isNotEmpty()) {
       item { Text("Recent trend", style = MaterialTheme.typography.titleLarge) }
       item { Text("${trendLabel(data.trend.change)} • recent ${data.trend.recent}% vs previous ${data.trend.previous}% (${signedPercent(data.trend.change)})") }
+      item {
+        Card(Modifier.fillMaxWidth()) {
+          Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text("Answer speed", style = MaterialTheme.typography.titleMedium)
+            Text("Recent average ${formatDurationMs(data.speedTrend.recentAverageMs)}")
+            if (data.speedTrend.previousAverageMs > 0) {
+              val difference = data.speedTrend.improvementMs
+              Text(
+                when {
+                  difference > 0 -> "${formatDurationMs(difference)} faster than the previous window"
+                  difference < 0 -> "${formatDurationMs(-difference)} slower than the previous window"
+                  else -> "Same average speed as the previous window"
+                },
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+              )
+            } else {
+              Text("Keep practising to establish a comparison window.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+          }
+        }
+      }
+      if (data.topicsNeedingRevision.isNotEmpty()) {
+        item { Text("Topic performance", style = MaterialTheme.typography.titleLarge) }
+        items(data.topicsNeedingRevision.take(10), key = { "performance-topic-${it.topic.id}" }) { topic ->
+          Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+              Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(topic.topic.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Text(topic.priority.label, color = MaterialTheme.colorScheme.primary)
+              }
+              LinearProgressIndicator(progress = { topic.accuracyPercent / 100f }, modifier = Modifier.fillMaxWidth())
+              Text("${topic.accuracyPercent}% accuracy • ${topic.mistakes} mistakes • ${topic.questionsNeedingRevision} due")
+            }
+          }
+        }
+      }
       item { Text("Weak questions", style = MaterialTheme.typography.titleLarge) }
       if (data.weakQuestions.isNotEmpty()) {
         item {
