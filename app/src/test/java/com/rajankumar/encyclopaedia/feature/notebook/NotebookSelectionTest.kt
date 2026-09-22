@@ -44,6 +44,18 @@ class NotebookSelectionTest {
     assertFalse(isSelectionResizeHandleHit(Offset(121f, 100f), bounds, radius = 20f))
   }
 
+  @Test fun translatePointAppliesDelta() {
+    assertEquals(Offset(17f, 4f), translateSelectionPoint(Offset(10f, 10f), Offset(7f, -6f)))
+  }
+
+  @Test fun duplicatePointUsesDefaultOffset() {
+    assertEquals(Offset(38f, 48f), duplicateSelectionPoint(Offset(10f, 20f)))
+  }
+
+  @Test fun duplicatePointSupportsCustomOffset() {
+    assertEquals(Offset(15f, 25f), duplicateSelectionPoint(Offset(10f, 20f), 5f))
+  }
+
   @Test fun scalePointKeepsCenterFixed() {
     val center = Offset(20f, 20f)
     assertEquals(center, scaleSelectionPoint(center, center, 3f))
