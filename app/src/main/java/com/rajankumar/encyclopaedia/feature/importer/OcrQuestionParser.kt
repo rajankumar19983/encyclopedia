@@ -43,15 +43,18 @@ object OcrQuestionParser {
     var answer: String? = null
 
     for (line in lines.drop(1)) {
-      answerLine.matchEntire(line)?.let {
-        answer = normalizeAnswer(it.groupValues[1])
+      val answerMatch = answerLine.matchEntire(line)
+      if (answerMatch != null) {
+        answer = normalizeAnswer(answerMatch.groupValues[1])
         currentOption = -1
-        return@let
-      }?.also { continue }
-      explanationStart.matchEntire(line)?.let {
+        continue
+      }
+      val explanationMatch = explanationStart.matchEntire(line)
+      if (explanationMatch != null) {
         inExplanation = true
         currentOption = -1
-        it.groupValues[1].takeIf(String::isNotBlank)?.let(explanation::add)
+        val initialExplanation = explanationMatch.groupValues[1]
+        if (initialExplanation.isNotBlank()) explanation += initialExplanation
         continue
       }
       if (inExplanation) {
@@ -105,12 +108,10 @@ object OcrQuestionParser {
   }
 
   private fun answerIndex(value: String): Int? = value.firstOrNull()?.let { it - 'A' }
-
   private fun removeExactDuplicates(items: List<ParsedQuestionDraft>): List<ParsedQuestionDraft> {
     val seen = mutableSetOf<String>()
     return items.filter { seen.add(fingerprint(it.questionText) + "|" + it.options.joinToString("|") { option -> fingerprint(option) }) }
   }
-
   private fun fingerprint(value: String): String = value.lowercase().replace(Regex("[^\\p{L}\\p{N}]+"), "")
   private fun join(left: String, right: String): String = "$left $right".replace(Regex("\\s+"), " ").trim()
   private fun normalize(value: String): String = value.replace('\u00A0', ' ').replace('“', '"').replace('”', '"').replace('’', '\'').replace(Regex("[ \\t]+"), " ").trim()
