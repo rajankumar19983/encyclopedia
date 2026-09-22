@@ -14,6 +14,8 @@ data class PerformanceData(
   val weakQuestions: List<WeakQuestion>,
   val topicPerformance: List<TopicPerformance> = emptyList(),
   val topicsNeedingRevision: List<TopicRevisionState> = emptyList(),
+  val studyVolume: StudyVolume = StudyVolume(0, 0, 0, 0),
+  val consistency: StudyConsistency = StudyConsistency(0, 0, 0),
 )
 
 fun buildPerformanceData(
@@ -30,5 +32,7 @@ fun buildPerformanceData(
     weakQuestions = buildWeakQuestions(questions, attempts),
     topicPerformance = buildTopicPerformance(topics, questionTopics, attempts),
     topicsNeedingRevision = buildTopicRevisionStates(topics, questionTopics, attempts),
+    studyVolume = attempts.studyVolume(),
+    consistency = attempts.studyConsistency(),
   )
 }
