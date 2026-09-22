@@ -10,6 +10,7 @@ data class TopicRevisionState(
   val correctAttempts: Int,
   val mistakes: Int,
   val questionsNeedingRevision: Int,
+  val revisionQuestionIds: List<String>,
   val accuracyPercent: Int,
   val priority: RevisionPriority,
 )
@@ -39,15 +40,16 @@ fun buildTopicRevisionStates(
 
       val mistakes = topicAttempts.count { !it.isCorrect }
       val correct = topicAttempts.count { it.isCorrect }
-      val needingRevision = questionIds.count { it in revisionQuestionIds }
-      if (needingRevision == 0) return@mapNotNull null
+      val dueQuestionIds = questionIds.filter { it in revisionQuestionIds }.sorted()
+      if (dueQuestionIds.isEmpty()) return@mapNotNull null
 
       TopicRevisionState(
         topic = topic,
         attempts = topicAttempts.size,
         correctAttempts = correct,
         mistakes = mistakes,
-        questionsNeedingRevision = needingRevision,
+        questionsNeedingRevision = dueQuestionIds.size,
+        revisionQuestionIds = dueQuestionIds,
         accuracyPercent = (correct * 100) / topicAttempts.size,
         priority = revisionPriority(mistakes, topicAttempts.size),
       )
