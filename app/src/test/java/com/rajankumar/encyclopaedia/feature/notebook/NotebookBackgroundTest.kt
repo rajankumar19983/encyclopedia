@@ -10,7 +10,7 @@ class NotebookBackgroundTest {
     assertEquals(NotebookBackground.GRID, parseNotebookBackground(" grid "))
 
   @Test fun acceptsAllSupportedBackgrounds() {
-    listOf("PLAIN", "RULED", "GRID", "DOTS").forEach { assertTrue(isSupportedNotebookBackground(it)) }
+    listOf("PLAIN", "LINED", "GRID").forEach { assertTrue(isSupportedNotebookBackground(it)) }
   }
 
   @Test fun rejectsUnknownBackground() = assertFalse(isSupportedNotebookBackground("paper"))
