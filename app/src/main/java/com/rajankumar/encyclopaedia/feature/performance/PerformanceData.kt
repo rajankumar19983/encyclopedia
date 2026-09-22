@@ -12,6 +12,7 @@ data class PerformanceData(
   val trend: AccuracyTrend,
   val speedTrend: SpeedTrend,
   val weakQuestions: List<WeakQuestion>,
+  val topicPerformance: List<TopicPerformance> = emptyList(),
   val topicsNeedingRevision: List<TopicRevisionState> = emptyList(),
 )
 
@@ -27,6 +28,7 @@ fun buildPerformanceData(
     trend = attempts.accuracyTrend(),
     speedTrend = attempts.speedTrend(),
     weakQuestions = buildWeakQuestions(questions, attempts),
+    topicPerformance = buildTopicPerformance(topics, questionTopics, attempts),
     topicsNeedingRevision = buildTopicRevisionStates(topics, questionTopics, attempts),
   )
 }
