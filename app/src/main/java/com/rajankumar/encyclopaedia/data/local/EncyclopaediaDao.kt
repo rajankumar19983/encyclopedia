@@ -30,6 +30,7 @@ interface EncyclopaediaDao {
   @Query("SELECT * FROM questions WHERE id IN (:ids)") suspend fun getQuestionsByIds(ids: List<String>): List<QuestionEntity>
   @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertQuestion(question: QuestionEntity)
   @Query("DELETE FROM questions WHERE id = :id") suspend fun deleteQuestion(id: String)
+  @Query("SELECT * FROM question_topics ORDER BY questionId, knowledgeNodeId") fun observeQuestionTopics(): Flow<List<QuestionTopicEntity>>
   @Query("SELECT * FROM question_topics ORDER BY questionId, knowledgeNodeId") suspend fun getAllQuestionTopicsForBackup(): List<QuestionTopicEntity>
   @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertQuestionTopic(link: QuestionTopicEntity)
   @Query("DELETE FROM question_topics WHERE questionId = :questionId") suspend fun clearQuestionTopics(questionId: String)
@@ -71,7 +72,6 @@ interface EncyclopaediaDao {
   @Query("UPDATE notebook_layers SET isVisible = :visible, updatedAt = :now WHERE id = :id") suspend fun setNotebookLayerVisible(id: String, visible: Boolean, now: Long = System.currentTimeMillis())
   @Query("UPDATE notebook_layers SET isLocked = :locked, updatedAt = :now WHERE id = :id") suspend fun setNotebookLayerLocked(id: String, locked: Boolean, now: Long = System.currentTimeMillis())
   @Query("DELETE FROM notebook_layers WHERE id = :id") suspend fun deleteNotebookLayer(id: String)
-  @Query("SELECT * FROM notebook_strokes WHERE layerId = :layerId ORDER BY createdAt") fun observeNotebookStrokes(layerId: String): Flow<List<NotebookStrokeEntity>>
   @Query("SELECT s.* FROM notebook_strokes s INNER JOIN notebook_layers l ON l.id = s.layerId WHERE l.pageId = :pageId ORDER BY l.sortOrder, l.createdAt, s.createdAt") fun observeNotebookPageStrokes(pageId: String): Flow<List<NotebookStrokeEntity>>
   @Query("SELECT * FROM notebook_strokes WHERE layerId = :layerId ORDER BY createdAt") suspend fun getNotebookStrokesOnce(layerId:String):List<NotebookStrokeEntity>
   @Query("SELECT * FROM notebook_strokes ORDER BY layerId, createdAt") suspend fun getAllNotebookStrokesForBackup(): List<NotebookStrokeEntity>
