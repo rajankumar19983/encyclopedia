@@ -35,4 +35,12 @@ class NotebookPageNamesTest {
   @Test fun distinctName_isAllowed() {
     assertTrue(isPageNameAvailable(pages, "Computer Networks"))
   }
+
+  @Test fun titleAtLimit_isAllowed() {
+    assertTrue(isPageNameAvailable(pages, "P".repeat(NOTEBOOK_PAGE_TITLE_MAX_LENGTH)))
+  }
+
+  @Test fun titleOverLimit_isRejected() {
+    assertFalse(isPageNameAvailable(pages, "P".repeat(NOTEBOOK_PAGE_TITLE_MAX_LENGTH + 1)))
+  }
 }
