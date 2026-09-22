@@ -18,4 +18,23 @@ class NotebookLayerOrderTest {
   @Test fun lastLayer_cannotMoveDown(){assertNull(layerOrderSwap(layers,"c",1))}
   @Test fun unknownLayer_isRejected(){assertNull(layerOrderSwap(layers,"missing",1))}
   @Test fun nonAdjacentDelta_isRejected(){assertNull(layerOrderSwap(layers,"b",2))}
+
+  @Test fun unorderedInput_isSortedByStoredOrderBeforeMoving(){
+    val unordered = listOf(layers[2], layers[0], layers[1])
+    val s = layerOrderSwap(unordered, "b", -1)!!
+    assertEquals("b", s.firstId)
+    assertEquals("a", s.secondId)
+  }
+
+  @Test fun gapsInStoredOrder_stillSwapVisualNeighbors(){
+    val gapped = listOf(
+      NotebookLayerEntity(id="a",pageId="page",name="A",sortOrder=10),
+      NotebookLayerEntity(id="b",pageId="page",name="B",sortOrder=30),
+      NotebookLayerEntity(id="c",pageId="page",name="C",sortOrder=90)
+    )
+    val s = layerOrderSwap(gapped, "b", 1)!!
+    assertEquals(30, s.firstOrder)
+    assertEquals("c", s.secondId)
+    assertEquals(90, s.secondOrder)
+  }
 }
