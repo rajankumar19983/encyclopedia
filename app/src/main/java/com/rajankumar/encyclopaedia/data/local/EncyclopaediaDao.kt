@@ -67,11 +67,13 @@ interface EncyclopaediaDao {
   @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertNotebookLayer(layer: NotebookLayerEntity)
   @Query("UPDATE notebook_layers SET name = :name, updatedAt = :now WHERE id = :id") suspend fun renameNotebookLayer(id: String, name: String, now: Long = System.currentTimeMillis())
   @Query("UPDATE notebook_layers SET sortOrder = :sortOrder, updatedAt = :now WHERE id = :id") suspend fun setNotebookLayerSortOrder(id: String, sortOrder: Int, now: Long = System.currentTimeMillis())
+  @Transaction suspend fun swapNotebookLayerOrder(firstId:String,firstOrder:Int,secondId:String,secondOrder:Int){setNotebookLayerSortOrder(firstId,secondOrder);setNotebookLayerSortOrder(secondId,firstOrder)}
   @Query("UPDATE notebook_layers SET isVisible = :visible, updatedAt = :now WHERE id = :id") suspend fun setNotebookLayerVisible(id: String, visible: Boolean, now: Long = System.currentTimeMillis())
   @Query("UPDATE notebook_layers SET isLocked = :locked, updatedAt = :now WHERE id = :id") suspend fun setNotebookLayerLocked(id: String, locked: Boolean, now: Long = System.currentTimeMillis())
   @Query("DELETE FROM notebook_layers WHERE id = :id") suspend fun deleteNotebookLayer(id: String)
   @Query("SELECT * FROM notebook_strokes WHERE layerId = :layerId ORDER BY createdAt") fun observeNotebookStrokes(layerId: String): Flow<List<NotebookStrokeEntity>>
   @Query("SELECT s.* FROM notebook_strokes s INNER JOIN notebook_layers l ON l.id = s.layerId WHERE l.pageId = :pageId ORDER BY l.sortOrder, l.createdAt, s.createdAt") fun observeNotebookPageStrokes(pageId: String): Flow<List<NotebookStrokeEntity>>
+  @Query("SELECT * FROM notebook_strokes WHERE layerId = :layerId ORDER BY createdAt") suspend fun getNotebookStrokesOnce(layerId:String):List<NotebookStrokeEntity>
   @Query("SELECT * FROM notebook_strokes ORDER BY layerId, createdAt") suspend fun getAllNotebookStrokesForBackup(): List<NotebookStrokeEntity>
   @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertNotebookStroke(stroke: NotebookStrokeEntity)
   @Query("DELETE FROM notebook_strokes WHERE id = :id") suspend fun deleteNotebookStroke(id: String)
