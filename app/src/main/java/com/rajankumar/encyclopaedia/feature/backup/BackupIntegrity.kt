@@ -1,5 +1,7 @@
 package com.rajankumar.encyclopaedia.feature.backup
 
+import com.rajankumar.encyclopaedia.feature.notebook.hasValidNotebookFields
+
 private fun List<String>.allUnique(): Boolean = size == toSet().size
 private fun List<String>.allPresent(): Boolean = all { it.isNotBlank() }
 
@@ -46,5 +48,11 @@ fun BackupSnapshot.hasValidNotebookRelationships(): Boolean {
   return true
 }
 
+fun BackupSnapshot.hasValidNotebookFields(): Boolean =
+  notebookPages.all { it.hasValidNotebookFields() } &&
+    notebookLayers.all { it.hasValidNotebookFields() } &&
+    notebookStrokes.all { it.hasValidNotebookFields() }
+
 fun BackupSnapshot.isSafeToRestore(): Boolean =
-  isInternallyConsistent() && hasValidPrimaryIds() && hasAcyclicKnowledgeHierarchy() && hasValidStudyRelationships() && hasValidNotebookRelationships()
+  isInternallyConsistent() && hasValidPrimaryIds() && hasAcyclicKnowledgeHierarchy() &&
+    hasValidStudyRelationships() && hasValidNotebookRelationships() && hasValidNotebookFields()
