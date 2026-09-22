@@ -121,10 +121,11 @@ internal data class CanvasStroke(val points:List<Offset>,val width:Float,val too
     withTransform({translate(viewport.offset.x,viewport.offset.y);scale(viewport.scale,viewport.scale,pivot=Offset.Zero)}){
       val guide=Color(0xFFE1E5EA)
       val spacing=48f
-      val worldLeft=-viewport.offset.x/viewport.scale
-      val worldTop=-viewport.offset.y/viewport.scale
-      val worldRight=worldLeft+size.width/viewport.scale
-      val worldBottom=worldTop+size.height/viewport.scale
+      val visibleBounds=viewport.visibleWorldBounds(size.width,size.height)
+      val worldLeft=visibleBounds.left
+      val worldTop=visibleBounds.top
+      val worldRight=visibleBounds.right
+      val worldBottom=visibleBounds.bottom
       if(background==NotebookBackground.LINED||background==NotebookBackground.GRID){
         var y=floor(worldTop/spacing)*spacing
         while(y<=worldBottom){drawLine(guide,Offset(worldLeft,y),Offset(worldRight,y),1f);y+=spacing}
@@ -153,8 +154,9 @@ internal data class CanvasStroke(val points:List<Offset>,val width:Float,val too
         drawPath(p,color,style=Stroke(width,cap=StrokeCap.Round,join=StrokeJoin.Round))
       }
       val selectedSet=selectedStrokes.toSet()
-      strokes.filter{it !in selectedSet}.forEach{drawS(it)}
-      selectedStrokes.forEach{drawS(it,true)}
+      val renderBounds=visibleBounds.expanded(48f/viewport.scale)
+      strokes.asSequence().filter{it !in selectedSet&&it.intersects(renderBounds)}.forEach{drawS(it)}
+      selectedStrokes.filter{it.intersects(renderBounds)}.forEach{drawS(it,true)}
       if(b!=null&&c!=null){
         val tl=previewPoint(Offset(b[0],b[1]));val br=previewPoint(Offset(b[2],b[3]))
         drawRect(Color(0xFF2563EB),topLeft=Offset(min(tl.x,br.x),min(tl.y,br.y)),size=Size(abs(br.x-tl.x),abs(br.y-tl.y)),style=Stroke(2f/viewport.scale,pathEffect=PathEffect.dashPathEffect(floatArrayOf(10f/viewport.scale,8f/viewport.scale))))
