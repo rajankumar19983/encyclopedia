@@ -15,11 +15,13 @@ internal fun layerOrderSwap(
   delta: Int
 ): LayerOrderSwap? {
   if (delta != -1 && delta != 1) return null
-  val index = layers.indexOfFirst { it.id == layerId }
+  val ordered = layers.sortedWith(compareBy<NotebookLayerEntity> { it.sortOrder }.thenBy { it.id })
+  val index = ordered.indexOfFirst { it.id == layerId }
+  if (index < 0) return null
   val targetIndex = index + delta
-  if (index < 0 || targetIndex !in layers.indices) return null
-  val current = layers[index]
-  val target = layers[targetIndex]
+  if (targetIndex !in ordered.indices) return null
+  val current = ordered[index]
+  val target = ordered[targetIndex]
   return LayerOrderSwap(
     firstId = current.id,
     firstOrder = current.sortOrder,
