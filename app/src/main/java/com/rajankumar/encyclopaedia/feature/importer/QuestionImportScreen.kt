@@ -31,11 +31,9 @@ import java.util.UUID
 import kotlinx.coroutines.launch
 
 private data class ReviewDraft(
-  val questionText: String,
-  val options: List<String>,
-  val answer: String,
-  val warnings: List<String>,
-  val source: String
+  val parsed: ParsedQuestionDraft,
+  val source: String,
+  val metadata: OcrSourceMetadata
 )
 
 @Composable
@@ -52,13 +50,15 @@ fun QuestionImportScreen(onDone: () -> Unit) {
 
   fun review(text: String, source: String) {
     rawText = text
-    drafts = OcrQuestionParser.parse(text).map {
-      ReviewDraft(it.questionText, it.options, it.correctAnswer.orEmpty(), it.warnings, source)
-    }
-    status = if (drafts.isEmpty()) {
-      "No reliably structured numbered MCQs were found. Nothing has been saved."
-    } else {
-      "${drafts.size} draft questions found. Review every item before saving."
+    val metadata = OcrSourceMetadataExtractor.extract(text)
+    val englishText = OcrLanguageFilter.removeDevanagariLines(text)
+    val parsed = OcrQuestionParser.parse(englishText)
+    val summary = parsed.reviewSummary()
+    drafts = parsed.map { ReviewDraft(it, source, metadata) }
+    status = when {
+      parsed.isEmpty() -> "No reliably structured English MCQs were found. Nothing has been saved."
+      summary.needsAttention > 0 -> "${summary.total} drafts found • ${summary.needsAttention} need attention before approval."
+      else -> "${summary.total} drafts found and ready for review. Nothing is saved until you approve it."
     }
   }
 
@@ -81,9 +81,7 @@ fun QuestionImportScreen(onDone: () -> Unit) {
       status = "Opening PDF…"
       scope.launch {
         runCatching {
-          pdfEngine.recognize(context, uri) { page, total ->
-            status = "Reading PDF page $page of $total…"
-          }
+          pdfEngine.recognize(context, uri) { page, total -> status = "Reading PDF page $page of $total…" }
         }.onSuccess { review(it, "PDF") }
           .onFailure { status = "PDF OCR failed: ${it.message ?: "unknown error"}" }
         busy = false
@@ -93,10 +91,7 @@ fun QuestionImportScreen(onDone: () -> Unit) {
 
   Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
     Text("Import Questions", style = MaterialTheme.typography.headlineMedium)
-    Text(
-      "Printed text only. Images rendered from PDFs are temporary and OCR drafts are never saved automatically.",
-      color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
+    Text("Printed English text only. Source images are not stored and OCR drafts are never saved automatically.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
       Button(onClick = { imagePicker.launch("image/*") }, enabled = !busy) { Text("Choose Image") }
       Button(onClick = { pdfPicker.launch("application/pdf") }, enabled = !busy) { Text("Choose PDF") }
@@ -108,78 +103,56 @@ fun QuestionImportScreen(onDone: () -> Unit) {
       Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
           Text("OCR text for diagnosis", style = MaterialTheme.typography.titleMedium)
-          Text(rawText.take(2500), color = MaterialTheme.colorScheme.onSurfaceVariant)
+          Text(OcrLanguageFilter.removeDevanagariLines(rawText).take(2500), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
       }
     }
 
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
       itemsIndexed(drafts) { index, initial ->
-        var question by remember(initial) { mutableStateOf(initial.questionText) }
-        var optionsText by remember(initial) { mutableStateOf(initial.options.joinToString("\n")) }
-        var answer by remember(initial) { mutableStateOf(initial.answer) }
+        var question by remember(initial) { mutableStateOf(initial.parsed.questionText) }
+        var optionsText by remember(initial) { mutableStateOf(initial.parsed.options.joinToString("\n")) }
+        var answer by remember(initial) { mutableStateOf(initial.parsed.correctAnswer.orEmpty()) }
         var saveState by remember(initial) { mutableStateOf("READY") }
-        val options = optionsText.lines().map { it.trim() }.filter { it.isNotBlank() }.take(6)
-        val validAnswer = answer.uppercase().singleOrNull()?.let {
-          options.isNotEmpty() && it in 'A'..('A'.code + options.lastIndex).toChar()
-        } == true
-        val valid = question.isNotBlank() && options.size in 2..6 && validAnswer
+        val options = optionsText.lines().map { it.trim() }.filter { it.isNotBlank() }
+        val answerIndex = answer.toIntOrNull()?.minus(1) ?: answer.uppercase().singleOrNull()?.let { it.code - 'A'.code }
+        val valid = question.isNotBlank() && options.size >= 2 && answerIndex != null && answerIndex in options.indices
+        val metadataLabel = listOfNotNull(initial.metadata.examName, initial.metadata.year?.toString()).joinToString(" • ")
 
         Card(Modifier.fillMaxWidth()) {
           Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Draft ${index + 1} • ${initial.source}", style = MaterialTheme.typography.titleMedium)
-            initial.warnings.forEach { Text("⚠ $it", color = MaterialTheme.colorScheme.error) }
+            Text("Draft ${index + 1} • ${initial.source}${if (metadataLabel.isBlank()) "" else " • $metadataLabel"}", style = MaterialTheme.typography.titleMedium)
+            if (initial.parsed.importReadiness() == ImportReadiness.NEEDS_ATTENTION) Text("Review required before saving", color = MaterialTheme.colorScheme.error)
+            initial.parsed.warnings.forEach { Text("⚠ $it", color = MaterialTheme.colorScheme.error) }
             OutlinedTextField(question, { question = it }, label = { Text("Question") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(
-              optionsText,
-              { optionsText = it },
-              label = { Text("Options — one per line (2–6)") },
-              modifier = Modifier.fillMaxWidth(),
-              minLines = 2
-            )
-            OutlinedTextField(answer, { answer = it.take(1).uppercase() }, label = { Text("Correct option A–F") })
+            OutlinedTextField(optionsText, { optionsText = it }, label = { Text("Options — one per line (2 or more)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+            OutlinedTextField(answer, { answer = it.take(2).uppercase() }, label = { Text("Correct option (A, B… or 1, 2…)") })
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-              Button(
-                enabled = valid && saveState == "READY",
-                onClick = {
-                  saveState = "SAVING"
-                  scope.launch {
-                    val inserted = dao.saveImportedQuestionIfUnique(
-                      QuestionEntity(
-                        id = UUID.randomUUID().toString(),
-                        questionText = question.trim(),
-                        options = options.joinToString("\n"),
-                        correctAnswer = answer.uppercase(),
-                        source = initial.source,
-                        difficulty = "UNRATED"
-                      ),
-                      null
-                    )
-                    saveState = if (inserted) "SAVED" else "DUPLICATE"
-                  }
+              Button(enabled = valid && saveState == "READY", onClick = {
+                saveState = "SAVING"
+                scope.launch {
+                  val normalizedAnswer = ('A'.code + (answerIndex ?: 0)).toChar().toString()
+                  val inserted = dao.saveImportedQuestionIfUnique(
+                    QuestionEntity(
+                      id = UUID.randomUUID().toString(),
+                      questionText = question.trim(),
+                      options = options.joinToString("\n"),
+                      correctAnswer = normalizedAnswer,
+                      explanation = initial.parsed.explanation,
+                      source = initial.source,
+                      difficulty = "UNRATED"
+                    ), null
+                  )
+                  saveState = if (inserted) "SAVED" else "DUPLICATE"
                 }
-              ) {
-                Text(
-                  when (saveState) {
-                    "SAVING" -> "Checking…"
-                    "SAVED" -> "Saved"
-                    "DUPLICATE" -> "Already exists"
-                    else -> "Approve & Save"
-                  }
-                )
+              }) {
+                Text(when (saveState) { "SAVING" -> "Checking…"; "SAVED" -> "Saved"; "DUPLICATE" -> "Already exists"; else -> "Approve & Save" })
               }
               TextButton(onClick = { drafts = drafts.filterIndexed { i, _ -> i != index } }) { Text("Reject") }
             }
             when {
-              saveState == "DUPLICATE" -> Text(
-                "This question and its options already exist in the Question Bank, so another copy was not created.",
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.bodySmall
-              )
-              !valid && saveState != "SAVED" -> Text(
-                "Review required: question, 2–6 options and a valid correct option are mandatory.",
-                style = MaterialTheme.typography.bodySmall
-              )
+              saveState == "DUPLICATE" -> Text("This question and its options already exist in the Question Bank, so another copy was not created.", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+              !valid && saveState != "SAVED" -> Text("Review required: question, at least 2 options and a valid correct option are mandatory.", style = MaterialTheme.typography.bodySmall)
             }
           }
         }
