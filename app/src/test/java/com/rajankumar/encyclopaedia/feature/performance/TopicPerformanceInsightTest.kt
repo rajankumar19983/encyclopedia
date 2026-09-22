@@ -6,8 +6,12 @@ import org.junit.Test
 
 class TopicPerformanceInsightTest {
   @Test fun pointsAtWeakestTopic() {
-    val item = TopicPerformance(KnowledgeNodeEntity("os", "Operating Systems", "TOPIC"), 10, 4, 6, 40, 3)
-    val insight = topicPerformanceInsight(performanceCoverage(3, listOf(item)), listOf(TopicPerformancePriority(item, 78, "Low accuracy")))
+    val topic = KnowledgeNodeEntity(id = "os", parentId = null, name = "Operating Systems")
+    val item = TopicPerformance(topic, 10, 4, 6, 40, 3)
+    val insight = topicPerformanceInsight(
+      performanceCoverage(3, listOf(item)),
+      listOf(TopicPerformancePriority(item, 78, "Low accuracy"))
+    )
     assertTrue(insight.headline.contains("Operating Systems"))
   }
 
