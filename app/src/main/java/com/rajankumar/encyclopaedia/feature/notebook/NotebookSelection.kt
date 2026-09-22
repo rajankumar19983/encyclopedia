@@ -7,6 +7,7 @@ internal const val NOTEBOOK_SELECTION_PADDING = 20f
 internal const val NOTEBOOK_SELECTION_HANDLE_RADIUS = 36f
 internal const val NOTEBOOK_SELECTION_MIN_SCALE = .25f
 internal const val NOTEBOOK_SELECTION_MAX_SCALE = 4f
+internal const val NOTEBOOK_SELECTION_DUPLICATE_OFFSET = 28f
 
 internal data class NotebookSelectionBounds(
   val left: Float,
@@ -35,6 +36,13 @@ internal fun selectionBounds(
     bottom = points.maxOf { it.y } + padding
   )
 }
+
+internal fun translateSelectionPoint(point: Offset, delta: Offset): Offset = point + delta
+
+internal fun duplicateSelectionPoint(
+  point: Offset,
+  offset: Float = NOTEBOOK_SELECTION_DUPLICATE_OFFSET
+): Offset = point + Offset(offset, offset)
 
 internal fun scaleSelectionPoint(point: Offset, center: Offset, scale: Float): Offset =
   Offset(
