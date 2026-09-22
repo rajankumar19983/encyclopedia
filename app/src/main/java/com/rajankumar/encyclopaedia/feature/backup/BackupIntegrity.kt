@@ -1,17 +1,17 @@
 package com.rajankumar.encyclopaedia.feature.backup
 
 private fun List<String>.allUnique(): Boolean = size == toSet().size
+private fun List<String>.allPresent(): Boolean = all { it.isNotBlank() }
 
-fun BackupSnapshot.hasUniquePrimaryIds(): Boolean =
-  knowledgeNodes.map { it.id }.allUnique() &&
-    lessons.map { it.id }.allUnique() &&
-    questions.map { it.id }.allUnique() &&
-    attempts.map { it.id }.allUnique() &&
-    plannerTasks.map { it.id }.allUnique() &&
-    notebookPages.map { it.id }.allUnique() &&
-    notebookLayers.map { it.id }.allUnique() &&
-    notebookStrokes.map { it.id }.allUnique() &&
+fun BackupSnapshot.hasValidPrimaryIds(): Boolean {
+  val idGroups = listOf(
+    knowledgeNodes.map { it.id }, lessons.map { it.id }, questions.map { it.id }, attempts.map { it.id },
+    plannerTasks.map { it.id }, notebookPages.map { it.id }, notebookLayers.map { it.id }, notebookStrokes.map { it.id }
+  )
+  return idGroups.all { it.allPresent() && it.allUnique() } &&
+    questionTopics.all { it.questionId.isNotBlank() && it.knowledgeNodeId.isNotBlank() } &&
     questionTopics.map { it.questionId to it.knowledgeNodeId }.let { it.size == it.toSet().size }
+}
 
 fun BackupSnapshot.hasAcyclicKnowledgeHierarchy(): Boolean {
   val parents = knowledgeNodes.associate { it.id to it.parentId }
@@ -47,4 +47,4 @@ fun BackupSnapshot.hasValidNotebookRelationships(): Boolean {
 }
 
 fun BackupSnapshot.isSafeToRestore(): Boolean =
-  isInternallyConsistent() && hasUniquePrimaryIds() && hasAcyclicKnowledgeHierarchy() && hasValidStudyRelationships() && hasValidNotebookRelationships()
+  isInternallyConsistent() && hasValidPrimaryIds() && hasAcyclicKnowledgeHierarchy() && hasValidStudyRelationships() && hasValidNotebookRelationships()
