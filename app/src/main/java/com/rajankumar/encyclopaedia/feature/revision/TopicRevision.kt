@@ -48,7 +48,7 @@ fun buildTopicRevisionStates(
         correctAttempts = correct,
         mistakes = mistakes,
         questionsNeedingRevision = needingRevision,
-        accuracyPercent = if (topicAttempts.isEmpty()) 0 else (correct * 100) / topicAttempts.size,
+        accuracyPercent = (correct * 100) / topicAttempts.size,
         priority = revisionPriority(mistakes, topicAttempts.size),
       )
     }
@@ -57,6 +57,7 @@ fun buildTopicRevisionStates(
         .thenByDescending { it.mistakes }
         .thenBy { it.topic.name.lowercase() }
     )
+    .toList()
 }
 
 internal fun List<QuestionAttemptEntity>.needsRevision(): Boolean {
