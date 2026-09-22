@@ -31,5 +31,18 @@ fun validateBackupSnapshot(snapshot: BackupSnapshot): BackupValidationResult {
     return BackupValidationResult.Invalid("Backup contains an attempt for a missing question.")
   }
 
+  val pageIds = snapshot.notebookPages.map { it.id }.toSet()
+  if (snapshot.notebookPages.any { it.knowledgeNodeId != null && it.knowledgeNodeId !in nodeIds }) {
+    return BackupValidationResult.Invalid("Backup contains a notebook page with a missing knowledge node.")
+  }
+
+  val layerIds = snapshot.notebookLayers.map { it.id }.toSet()
+  if (snapshot.notebookLayers.any { it.pageId !in pageIds }) {
+    return BackupValidationResult.Invalid("Backup contains a notebook layer with a missing page.")
+  }
+  if (snapshot.notebookStrokes.any { it.layerId !in layerIds }) {
+    return BackupValidationResult.Invalid("Backup contains a notebook stroke with a missing layer.")
+  }
+
   return BackupValidationResult.Valid
 }
