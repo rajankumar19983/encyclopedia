@@ -1,6 +1,6 @@
-package com.rajankumar19983.encyclopaedia.feature.notebook
+package com.rajankumar.encyclopaedia.feature.notebook
 
-import com.rajankumar19983.encyclopaedia.data.local.NotebookLayerEntity
+import com.rajankumar.encyclopaedia.data.local.NotebookLayerEntity
 
 internal data class LayerOrderSwap(
   val firstId: String,
