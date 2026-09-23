@@ -1,9 +1,15 @@
 package com.rajankumar.encyclopaedia.feature.backup
 
-data class BackupRestoreReadiness(val ready: Boolean, val reason: String?)
+enum class BackupRestoreReadiness {
+  READY,
+  REVIEW_WARNINGS,
+  BLOCKED_BY_COMPATIBILITY,
+  BLOCKED_BY_INTEGRITY
+}
 
-fun restoreReadiness(version: Int, integrityValid: Boolean): BackupRestoreReadiness = when (backupCompatibility(version)) {
-  BackupCompatibility.TOO_OLD -> BackupRestoreReadiness(false, "This backup is too old for this app version.")
-  BackupCompatibility.TOO_NEW -> BackupRestoreReadiness(false, "Update the app before restoring this newer backup.")
-  BackupCompatibility.SUPPORTED -> if (integrityValid) BackupRestoreReadiness(true, null) else BackupRestoreReadiness(false, "Backup integrity check failed.")
+fun BackupInspection.restoreReadiness(): BackupRestoreReadiness = when {
+  !preflight.canRestore -> BackupRestoreReadiness.BLOCKED_BY_COMPATIBILITY
+  integrity?.hasBlockingIssues == true -> BackupRestoreReadiness.BLOCKED_BY_INTEGRITY
+  integrity?.hasWarnings == true -> BackupRestoreReadiness.REVIEW_WARNINGS
+  else -> BackupRestoreReadiness.READY
 }

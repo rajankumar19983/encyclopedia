@@ -1,11 +1,50 @@
 package com.rajankumar.encyclopaedia.feature.backup
 
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import com.rajankumar.encyclopaedia.feature.integrity.IntegrityIssue
+import com.rajankumar.encyclopaedia.feature.integrity.IntegrityReport
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class BackupRestoreReadinessTest {
-  @Test fun supportedValidBackupIsReady() = assertTrue(restoreReadiness(BACKUP_FORMAT_VERSION, true).ready)
-  @Test fun invalidBackupIsBlocked() = assertFalse(restoreReadiness(BACKUP_FORMAT_VERSION, false).ready)
-  @Test fun futureBackupIsBlocked() = assertFalse(restoreReadiness(BACKUP_FORMAT_VERSION + 1, true).ready)
+  private fun inspection(
+    compatibility: BackupCompatibility = BackupCompatibility.SUPPORTED,
+    issues: Set<IntegrityIssue> = emptySet()
+  ) = BackupInspection(
+    preflight = BackupPreflight(
+      compatibility = compatibility,
+      recordCount = 3,
+      canInspect = true,
+      canRestore = compatibility == BackupCompatibility.SUPPORTED
+    ),
+    integrity = if (compatibility == BackupCompatibility.SUPPORTED) IntegrityReport(issues, 3) else null
+  )
+
+  @Test
+  fun healthyBackupIsReady() {
+    assertEquals(BackupRestoreReadiness.READY, inspection().restoreReadiness())
+  }
+
+  @Test
+  fun warningBackupRequiresReview() {
+    assertEquals(
+      BackupRestoreReadiness.REVIEW_WARNINGS,
+      inspection(issues = setOf(IntegrityIssue.FIELDS)).restoreReadiness()
+    )
+  }
+
+  @Test
+  fun blockingIssueBlocksByIntegrity() {
+    assertEquals(
+      BackupRestoreReadiness.BLOCKED_BY_INTEGRITY,
+      inspection(issues = setOf(IntegrityIssue.IDS)).restoreReadiness()
+    )
+  }
+
+  @Test
+  fun incompatibleBackupBlocksBeforeIntegrity() {
+    assertEquals(
+      BackupRestoreReadiness.BLOCKED_BY_COMPATIBILITY,
+      inspection(BackupCompatibility.TOO_NEW).restoreReadiness()
+    )
+  }
 }
