@@ -5,7 +5,33 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class IntegrityAuditTest {
-  private fun snapshot(manifest: BackupManifest) = BackupSnapshot(manifest, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
-  @Test fun cleanEmptySnapshotHasNoIssues() = assertTrue(snapshot(BackupManifest(1L, 0, 0, 0, 0, 0, 0)).integrityIssues().isEmpty())
-  @Test fun countMismatchReportsManifestIssue() = assertTrue(IntegrityIssue.MANIFEST in snapshot(BackupManifest(1L, 0, 0, 1, 0, 0, 0)).integrityIssues())
+  private fun manifest(questionCount: Int = 0) = BackupManifest(
+    createdAt = 1L,
+    knowledgeNodeCount = 0,
+    lessonCount = 0,
+    questionCount = questionCount,
+    questionTopicCount = 0,
+    attemptCount = 0,
+    plannerTaskCount = 0
+  )
+
+  private fun snapshot(manifest: BackupManifest) = BackupSnapshot(
+    manifest = manifest,
+    knowledgeNodes = emptyList(),
+    lessons = emptyList(),
+    questions = emptyList(),
+    questionTopics = emptyList(),
+    attempts = emptyList(),
+    plannerTasks = emptyList()
+  )
+
+  @Test
+  fun cleanEmptySnapshotHasNoIssues() = assertTrue(
+    snapshot(manifest()).integrityIssues().isEmpty()
+  )
+
+  @Test
+  fun countMismatchReportsManifestIssue() = assertTrue(
+    IntegrityIssue.MANIFEST in snapshot(manifest(questionCount = 1)).integrityIssues()
+  )
 }
