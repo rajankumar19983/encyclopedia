@@ -17,7 +17,7 @@ import androidx.room.RoomDatabase
     NotebookLayerEntity::class,
     NotebookStrokeEntity::class
   ],
-  version = 4,
+  version = DatabaseVersions.CURRENT,
   exportSchema = false
 )
 abstract class EncyclopaediaDatabase : RoomDatabase() {
@@ -31,7 +31,7 @@ abstract class EncyclopaediaDatabase : RoomDatabase() {
         context.applicationContext,
         EncyclopaediaDatabase::class.java,
         "encyclopaedia.db"
-      ).fallbackToDestructiveMigration(false).build().also { instance = it }
+      ).addMigrations(*ALL_MIGRATIONS).build().also { instance = it }
     }
   }
 }
