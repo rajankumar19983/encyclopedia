@@ -5,9 +5,10 @@ import org.junit.Test
 
 class PerformanceConfidenceTest {
   @Test fun confidenceGrowsWithEvidence() {
-    assertEquals(PerformanceConfidence.NONE, performanceConfidence(0))
+    assertEquals(PerformanceConfidence.LOW, performanceConfidence(0))
     assertEquals(PerformanceConfidence.LOW, performanceConfidence(5))
-    assertEquals(PerformanceConfidence.MODERATE, performanceConfidence(20))
-    assertEquals(PerformanceConfidence.HIGH, performanceConfidence(40))
+    assertEquals(PerformanceConfidence.MEDIUM, performanceConfidence(20))
+    assertEquals(PerformanceConfidence.MEDIUM, performanceConfidence(40))
+    assertEquals(PerformanceConfidence.HIGH, performanceConfidence(100))
   }
 }
