@@ -32,6 +32,7 @@ fun OpenAiSettingsScreen(
   settings: OpenAiSettings
 ) {
   val scope = rememberCoroutineScope()
+  val guidance = remember { openAiKeyGuidance() }
   var apiKey by remember { mutableStateOf("") }
   var config by remember { mutableStateOf(settings.read()) }
   var configured by remember { mutableStateOf(manager.isConfigured()) }
@@ -44,10 +45,9 @@ fun OpenAiSettingsScreen(
     verticalArrangement = Arrangement.spacedBy(16.dp)
   ) {
     Text("AI Teacher", style = MaterialTheme.typography.headlineSmall)
-    Text(
-      "Connect your own OpenAI API key. The key is encrypted on this device and excluded from backups.",
-      color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
+    Text(guidance.localStorageNotice, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(guidance.riskNotice, color = MaterialTheme.colorScheme.error)
+    Text(guidance.rotationNotice, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Text(status, color = if (configured) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
 
     OutlinedTextField(
@@ -72,7 +72,7 @@ fun OpenAiSettingsScreen(
               configured = true
               status = "Connected. $count compatible model${if (count == 1) "" else "s"} available."
             }
-            .onFailure { error -> status = error.message ?: "Connection failed" }
+            .onFailure { error -> status = classifyTeacherFailure(error.message).userMessage() }
           testing = false
         }
       },
