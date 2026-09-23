@@ -1,5 +1,12 @@
 package com.rajankumar.encyclopaedia.feature.integrity
 
+data class IntegrityCheckItem(
+  val label: String,
+  val severity: IntegritySeverity,
+  val message: String,
+  val guidance: String
+)
+
 data class IntegrityCheckPresentation(
   val title: String,
   val summary: String,
@@ -7,7 +14,7 @@ data class IntegrityCheckPresentation(
   val blockingIssues: Int,
   val warnings: Int,
   val recordsChecked: Int,
-  val details: List<IntegrityIssueDetail>
+  val items: List<IntegrityCheckItem>
 )
 
 fun IntegrityReport.toCheckPresentation(): IntegrityCheckPresentation = IntegrityCheckPresentation(
@@ -29,5 +36,12 @@ fun IntegrityReport.toCheckPresentation(): IntegrityCheckPresentation = Integrit
   blockingIssues = errorCount,
   warnings = warningCount,
   recordsChecked = recordCount,
-  details = details.sortedWith(compareBy<IntegrityIssueDetail> { it.severity != IntegritySeverity.ERROR }.thenBy { it.issue.code() })
+  items = sortedDetails().map { detail ->
+    IntegrityCheckItem(
+      label = detail.issue.label(),
+      severity = detail.severity,
+      message = detail.message,
+      guidance = detail.issue.guidance()
+    )
+  }
 )
