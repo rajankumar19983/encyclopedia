@@ -7,6 +7,5 @@ data class EditableImportDraft(
 ) {
   val cleanedOptions: List<String> get() = options.map(String::trim).filter(String::isNotBlank)
 
-  fun isValid(): Boolean =
-    question.isNotBlank() && cleanedOptions.size >= 2 && normalizedImportedAnswer(answer, cleanedOptions.size) != null
+  fun isValid(): Boolean = validateForSave().canSave
 }
