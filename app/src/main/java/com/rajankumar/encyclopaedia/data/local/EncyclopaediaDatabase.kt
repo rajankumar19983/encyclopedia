@@ -12,9 +12,12 @@ import androidx.room.RoomDatabase
     QuestionEntity::class,
     QuestionTopicEntity::class,
     QuestionAttemptEntity::class,
-    PlannerTaskEntity::class
+    PlannerTaskEntity::class,
+    NotebookPageEntity::class,
+    NotebookLayerEntity::class,
+    NotebookStrokeEntity::class
   ],
-  version = 3,
+  version = DatabaseVersions.CURRENT,
   exportSchema = false
 )
 abstract class EncyclopaediaDatabase : RoomDatabase() {
@@ -28,7 +31,7 @@ abstract class EncyclopaediaDatabase : RoomDatabase() {
         context.applicationContext,
         EncyclopaediaDatabase::class.java,
         "encyclopaedia.db"
-      ).fallbackToDestructiveMigration(false).build().also { instance = it }
+      ).addMigrations(*ALL_MIGRATIONS).build().also { instance = it }
     }
   }
 }

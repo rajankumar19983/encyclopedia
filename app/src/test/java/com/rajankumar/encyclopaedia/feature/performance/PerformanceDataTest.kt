@@ -1,8 +1,11 @@
 package com.rajankumar.encyclopaedia.feature.performance
 
+import com.rajankumar.encyclopaedia.data.local.KnowledgeNodeEntity
 import com.rajankumar.encyclopaedia.data.local.QuestionAttemptEntity
 import com.rajankumar.encyclopaedia.data.local.QuestionEntity
+import com.rajankumar.encyclopaedia.data.local.QuestionTopicEntity
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PerformanceDataTest {
@@ -33,6 +36,46 @@ class PerformanceDataTest {
     )
 
     assertEquals(0L, data.summary.averageTimeMs)
+  }
+
+  @Test
+  fun performanceDataIncludesLinkedTopicsStillNeedingRevision() {
+    val topic = KnowledgeNodeEntity("networks", null, "Computer Networks")
+    val attempts = listOf(
+      attempt("a1", "q1", false, 2_000L, 1L),
+      attempt("a2", "q1", true, 1_500L, 2L),
+    )
+
+    val data = buildPerformanceData(
+      questions = listOf(question("q1")),
+      attempts = attempts,
+      topics = listOf(topic),
+      questionTopics = listOf(QuestionTopicEntity("q1", "networks")),
+    )
+
+    val topicPerformance = data.topicsNeedingRevision.single()
+    assertEquals("networks", topicPerformance.topic.id)
+    assertEquals(listOf("q1"), topicPerformance.revisionQuestionIds)
+    assertEquals(50, topicPerformance.accuracyPercent)
+  }
+
+  @Test
+  fun recoveredTopicIsNotReportedAsNeedingRevision() {
+    val topic = KnowledgeNodeEntity("dbms", null, "DBMS")
+    val attempts = listOf(
+      attempt("a1", "q1", false, 2_000L, 1L),
+      attempt("a2", "q1", true, 1_500L, 2L),
+      attempt("a3", "q1", true, 1_000L, 3L),
+    )
+
+    val data = buildPerformanceData(
+      questions = listOf(question("q1")),
+      attempts = attempts,
+      topics = listOf(topic),
+      questionTopics = listOf(QuestionTopicEntity("q1", "dbms")),
+    )
+
+    assertTrue(data.topicsNeedingRevision.isEmpty())
   }
 
   private fun question(id: String) = QuestionEntity(

@@ -46,11 +46,25 @@ fun PlannerHistoryScreen(modifier: Modifier = Modifier) {
   val pendingLoad = tasks.pendingLoad()
   val carriedRecovery = tasks.carriedCompletionPercent()
   val backlogPressure = tasks.backlogPressurePercent()
+  val insight = history.plannerHistoryInsight()
+  val planSize = history.planSizeComparison()
+  val recovery = tasks.plannerRecoveryInsight()
+  val health = history.plannerHistoryHealth()
 
   LazyColumn(modifier = modifier.padding(28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
     item {
       Text("Planner history", style = MaterialTheme.typography.headlineMedium)
       Text("Review how much of each day's study plan you completed.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    item {
+      Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+          Text(health.label(), style = MaterialTheme.typography.titleMedium)
+          Text(insight.message)
+          Text(planSize.message(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          Text(recovery.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+      }
     }
     if (history.isNotEmpty()) {
       item {

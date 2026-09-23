@@ -31,7 +31,12 @@ fun RevisionScreen(onStartPractice: () -> Unit = {}) {
   val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
   val questions by dao.observeQuestions().collectAsStateWithLifecycle(emptyList())
   val attempts by dao.observeAllAttempts().collectAsStateWithLifecycle(emptyList())
+  val topics by dao.observeAllNodes().collectAsStateWithLifecycle(emptyList())
+  val questionTopics by dao.observeQuestionTopics().collectAsStateWithLifecycle(emptyList())
   val queue = remember(questions, attempts) { buildRevisionQueue(questions, attempts) }
+  val topicRevision = remember(topics, questionTopics, attempts) {
+    buildTopicRevisionStates(topics, questionTopics, attempts)
+  }
   var query by remember { mutableStateOf("") }
   var priority by remember { mutableStateOf<RevisionPriority?>(null) }
   var sort by remember { mutableStateOf(RevisionSort.PRIORITY) }
@@ -70,6 +75,25 @@ fun RevisionScreen(onStartPractice: () -> Unit = {}) {
               RevisionPracticeRequest.set(currentSession.questions.map { it.id })
               onStartPractice()
             }) { Text("Start revision practice") }
+          }
+        }
+      }
+    }
+    if (topicRevision.isNotEmpty()) {
+      item { Text("Topics to revise", style = MaterialTheme.typography.titleLarge) }
+      items(topicRevision, key = { "topic-${it.topic.id}" }) { topicState ->
+        Card(Modifier.fillMaxWidth()) {
+          Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+              Text(topicState.topic.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+              Text(topicState.priority.label, color = MaterialTheme.colorScheme.primary)
+            }
+            Text("${topicState.questionsNeedingRevision} question(s) due • ${topicState.mistakes} mistakes")
+            Text("${topicState.accuracyPercent}% accuracy across ${topicState.attempts} attempts", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Button(onClick = {
+              RevisionPracticeRequest.set(topicState.revisionQuestionIds)
+              onStartPractice()
+            }) { Text("Practise this topic") }
           }
         }
       }

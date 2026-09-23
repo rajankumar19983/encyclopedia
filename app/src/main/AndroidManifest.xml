@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.INTERNET" />
+
   <queries>
     <intent>
       <action android:name="android.intent.action.TTS_SERVICE" />
@@ -8,9 +10,11 @@
 
   <application
     android:allowBackup="true"
+    android:dataExtractionRules="@xml/backup_rules"
     android:label="Encyclopaedia"
     android:supportsRtl="true"
-    android:theme="@style/Theme.Encyclopaedia">
+    android:theme="@style/Theme.Encyclopaedia"
+    android:usesCleartextTraffic="false">
     <activity
       android:name=".MainActivity"
       android:exported="true">

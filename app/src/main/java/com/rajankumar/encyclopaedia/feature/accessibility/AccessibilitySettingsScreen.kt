@@ -6,8 +6,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,15 +19,33 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.rajankumar.encyclopaedia.feature.backup.BackupSettingsSection
+import com.rajankumar.encyclopaedia.feature.teacher.OpenAiApiKeyStore
+import com.rajankumar.encyclopaedia.feature.teacher.OpenAiConnectionManager
+import com.rajankumar.encyclopaedia.feature.teacher.OpenAiHttpApi
+import com.rajankumar.encyclopaedia.feature.teacher.OpenAiSettings
+import com.rajankumar.encyclopaedia.feature.teacher.OpenAiSettingsScreen
 
 @Composable
 fun AccessibilitySettingsScreen() {
+  val context = LocalContext.current.applicationContext
   val speech = rememberTextToSpeechController()
   var rate by remember { mutableStateOf(SpeechRate.NORMAL) }
+  val openAiSettings = remember(context) { OpenAiSettings(context) }
+  val openAiManager = remember(context) {
+    OpenAiConnectionManager(
+      keyStore = OpenAiApiKeyStore(context),
+      api = OpenAiHttpApi()
+    )
+  }
 
   Column(
-    modifier = Modifier.fillMaxSize().padding(28.dp),
+    modifier = Modifier
+      .fillMaxSize()
+      .verticalScroll(rememberScrollState())
+      .padding(28.dp),
     verticalArrangement = Arrangement.spacedBy(18.dp)
   ) {
     Text("Settings", style = MaterialTheme.typography.headlineMedium)
@@ -57,5 +78,14 @@ fun AccessibilitySettingsScreen() {
     ) {
       Text("Preview voice")
     }
+
+    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+    BackupSettingsSection()
+    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+
+    OpenAiSettingsScreen(
+      manager = openAiManager,
+      settings = openAiSettings
+    )
   }
 }

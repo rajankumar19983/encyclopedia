@@ -47,6 +47,12 @@ fun PlannerScreen() {
   val progress = tasks.plannerProgress()
   val carryOver = tasks.carryOverSummary()
   val stats = tasks.completionStats()
+  val todaySummary = tasks.plannerTodaySummary()
+  val carryWarning = tasks.plannerCarryWarning()
+  val capacity = tasks.plannerCapacity()
+  val recommendation = tasks.dailyPlannerRecommendation()
+  val priorities = tasks.plannerPriorities()
+  val nextAction = tasks.plannerNextAction()
   var title by remember { mutableStateOf("") }
   var showHistory by remember { mutableStateOf(false) }
   var editingTaskId by remember { mutableStateOf<String?>(null) }
@@ -75,35 +81,53 @@ fun PlannerScreen() {
           scope.launch(Dispatchers.IO) { dao.deletePlannerTask(task.id) }
         }) { Text("Delete") }
       },
-      dismissButton = {
-        TextButton(onClick = { taskToDelete = null }) { Text("Cancel") }
-      }
+      dismissButton = { TextButton(onClick = { taskToDelete = null }) { Text("Cancel") } }
     )
   }
 
   if (showHistory) {
     Column(Modifier.fillMaxSize()) {
-      OutlinedButton(
-        onClick = { showHistory = false },
-        modifier = Modifier.padding(start = 28.dp, top = 20.dp)
-      ) { Text("Back to today") }
+      OutlinedButton(onClick = { showHistory = false }, modifier = Modifier.padding(start = 28.dp, top = 20.dp)) { Text("Back to today") }
       PlannerHistoryScreen(Modifier.weight(1f))
     }
     return
   }
 
-  LazyColumn(
-    Modifier.fillMaxSize().padding(28.dp),
-    verticalArrangement = Arrangement.spacedBy(14.dp)
-  ) {
+  LazyColumn(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
     item {
       Text("Daily Planner", style = MaterialTheme.typography.headlineMedium)
       Text(plannerDisplayDate(today), color = MaterialTheme.colorScheme.onSurfaceVariant)
       Text(progress.summaryText(), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 6.dp))
-      OutlinedButton(
-        onClick = { showHistory = true },
-        modifier = Modifier.padding(top = 10.dp)
-      ) { Text("View history") }
+      OutlinedButton(onClick = { showHistory = true }, modifier = Modifier.padding(top = 10.dp)) { Text("View history") }
+    }
+    item {
+      Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+          Text(todaySummary.status.displayText(), style = MaterialTheme.typography.titleMedium)
+          Text(todaySummary.focus.headline())
+          Text(todaySummary.supportingText(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+          carryWarning?.let { Text(it.message, style = MaterialTheme.typography.bodySmall) }
+          Text(capacity.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+      }
+    }
+    item {
+      Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+          Text(recommendation.title, style = MaterialTheme.typography.titleMedium)
+          Text(recommendation.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          nextAction?.let {
+            Text("Next: ${it.title}", style = MaterialTheme.typography.bodyLarge)
+            Text(it.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          }
+          if (priorities.size > 1) {
+            Text("Up next", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
+            priorities.drop(1).forEach { priority ->
+              Text("${priority.rank}. ${priority.task.title} • ${priority.reason}", style = MaterialTheme.typography.bodySmall)
+            }
+          }
+        }
+      }
     }
     if (carryOver.carriedCount > 0) {
       item {
@@ -111,9 +135,7 @@ fun PlannerScreen() {
           Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Carried-over work", style = MaterialTheme.typography.titleMedium)
             Text("${carryOver.carriedCount} unfinished ${if (carryOver.carriedCount == 1) "task was" else "tasks were"} moved into today.")
-            carryOver.oldestSourceDate?.let {
-              Text("Oldest pending since ${plannerDisplayDate(it)}.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            carryOver.oldestSourceDate?.let { Text("Oldest pending since ${plannerDisplayDate(it)}.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
           }
         }
       }
@@ -123,16 +145,9 @@ fun PlannerScreen() {
         Card(Modifier.fillMaxWidth()) {
           Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Today's progress", style = MaterialTheme.typography.titleMedium)
-            LinearProgressIndicator(
-              progress = { progress.percent / 100f },
-              modifier = Modifier.fillMaxWidth()
-            )
+            LinearProgressIndicator(progress = { progress.percent / 100f }, modifier = Modifier.fillMaxWidth())
             Text("${progress.completed} of ${progress.total} completed • ${progress.remaining} remaining (${progress.percent}%)")
-            Text(
-              "Completed ${stats.completedToday} • Carried pending ${stats.carriedPending} • New pending ${stats.newlyPlannedPending}",
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text("Completed ${stats.completedToday} • Carried pending ${stats.carriedPending} • New pending ${stats.newlyPlannedPending}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
           }
         }
       }
@@ -141,87 +156,39 @@ fun PlannerScreen() {
       Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
           Text("Add today's task", style = MaterialTheme.typography.titleMedium)
-          OutlinedTextField(
-            value = title,
-            onValueChange = { title = it.take(160) },
-            label = { Text("Study task") },
-            supportingText = { Text("${title.length}/160") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-          )
-          Button(
-            enabled = isValidPlannerTaskTitle(title),
-            onClick = {
-              val cleanTitle = normalizePlannerTaskTitle(title)
-              title = ""
-              scope.launch(Dispatchers.IO) {
-                dao.upsertPlannerTask(
-                  PlannerTaskEntity(
-                    id = UUID.randomUUID().toString(),
-                    title = cleanTitle,
-                    scheduledDate = today
-                  )
-                )
-              }
-            }
-          ) { Text("Add task") }
+          OutlinedTextField(value = title, onValueChange = { title = it.take(160) }, label = { Text("Study task") }, supportingText = { Text("${title.length}/160") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+          Button(enabled = isValidPlannerTaskTitle(title), onClick = {
+            val cleanTitle = normalizePlannerTaskTitle(title)
+            title = ""
+            scope.launch(Dispatchers.IO) { dao.upsertPlannerTask(PlannerTaskEntity(id = UUID.randomUUID().toString(), title = cleanTitle, scheduledDate = today)) }
+          }) { Text("Add task") }
         }
       }
     }
-    if (orderedTasks.isEmpty()) {
-      item { Text("No tasks planned for today yet.") }
-    } else {
-      items(orderedTasks, key = { it.id }) { task ->
-        Card(Modifier.fillMaxWidth()) {
-          Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Checkbox(
-              checked = task.isCompleted,
-              onCheckedChange = { completed ->
-                scope.launch(Dispatchers.IO) {
-                  dao.setPlannerTaskCompleted(task.id, completed, if (completed) System.currentTimeMillis() else null)
-                }
+    if (orderedTasks.isEmpty()) item { Text("No tasks planned for today yet.") }
+    else items(orderedTasks, key = { it.id }) { task ->
+      Card(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          Checkbox(checked = task.isCompleted, onCheckedChange = { completed -> scope.launch(Dispatchers.IO) { dao.setPlannerTaskCompleted(task.id, completed, if (completed) System.currentTimeMillis() else null) } })
+          Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (editingTaskId == task.id) {
+              OutlinedTextField(value = editTitle, onValueChange = { editTitle = plannerTaskEditValue(it) }, label = { Text("Study task") }, supportingText = { Text("${editTitle.length}/160") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+              Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(enabled = canSavePlannerTaskEdit(editTitle), onClick = {
+                  val savedTitle = savedPlannerTaskTitle(editTitle)
+                  editingTaskId = null
+                  editTitle = ""
+                  scope.launch(Dispatchers.IO) { dao.updatePlannerTaskTitle(task.id, savedTitle) }
+                }) { Text("Save") }
+                OutlinedButton(onClick = { editingTaskId = null; editTitle = "" }) { Text("Cancel") }
               }
-            )
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-              if (editingTaskId == task.id) {
-                OutlinedTextField(
-                  value = editTitle,
-                  onValueChange = { editTitle = plannerTaskEditValue(it) },
-                  label = { Text("Study task") },
-                  supportingText = { Text("${editTitle.length}/160") },
-                  modifier = Modifier.fillMaxWidth(),
-                  singleLine = true
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                  Button(
-                    enabled = canSavePlannerTaskEdit(editTitle),
-                    onClick = {
-                      val savedTitle = savedPlannerTaskTitle(editTitle)
-                      editingTaskId = null
-                      editTitle = ""
-                      scope.launch(Dispatchers.IO) {
-                        dao.updatePlannerTaskTitle(task.id, savedTitle)
-                      }
-                    }
-                  ) { Text("Save") }
-                  OutlinedButton(onClick = {
-                    editingTaskId = null
-                    editTitle = ""
-                  }) { Text("Cancel") }
-                }
-              } else {
-                Text(task.title, style = MaterialTheme.typography.titleMedium)
-                task.carriedFromDate?.let {
-                  Text("Carried from ${plannerDisplayDate(it)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                TextButton(onClick = {
-                  editingTaskId = task.id
-                  editTitle = plannerTaskEditValue(task.title)
-                }) { Text("Edit") }
-              }
+            } else {
+              Text(task.title, style = MaterialTheme.typography.titleMedium)
+              task.carriedFromDate?.let { Text("Carried from ${plannerDisplayDate(it)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+              TextButton(onClick = { editingTaskId = task.id; editTitle = plannerTaskEditValue(task.title) }) { Text("Edit") }
             }
-            IconButton(onClick = { taskToDelete = task }) { Text("×") }
           }
+          IconButton(onClick = { taskToDelete = task }) { Text("×") }
         }
       }
     }

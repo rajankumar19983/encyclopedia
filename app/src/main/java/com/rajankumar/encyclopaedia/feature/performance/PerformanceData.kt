@@ -1,21 +1,40 @@
 package com.rajankumar.encyclopaedia.feature.performance
 
+import com.rajankumar.encyclopaedia.data.local.KnowledgeNodeEntity
 import com.rajankumar.encyclopaedia.data.local.QuestionAttemptEntity
 import com.rajankumar.encyclopaedia.data.local.QuestionEntity
+import com.rajankumar.encyclopaedia.data.local.QuestionTopicEntity
+import com.rajankumar.encyclopaedia.feature.revision.TopicRevisionState
+import com.rajankumar.encyclopaedia.feature.revision.buildTopicRevisionStates
 
 data class PerformanceData(
   val summary: PerformanceSummary,
   val trend: AccuracyTrend,
   val speedTrend: SpeedTrend,
-  val weakQuestions: List<WeakQuestion>
+  val weakQuestions: List<WeakQuestion>,
+  val topicPerformance: List<TopicPerformance> = emptyList(),
+  val topicsNeedingRevision: List<TopicRevisionState> = emptyList(),
+  val studyVolume: StudyVolume = StudyVolume(0, 0, 0, 0),
+  val consistency: StudyConsistency = StudyConsistency(0, 0, 0),
+  val dailyActivity: List<DailyStudyActivity> = emptyList(),
 )
 
-fun buildPerformanceData(questions: List<QuestionEntity>, attempts: List<QuestionAttemptEntity>): PerformanceData {
+fun buildPerformanceData(
+  questions: List<QuestionEntity>,
+  attempts: List<QuestionAttemptEntity>,
+  topics: List<KnowledgeNodeEntity> = emptyList(),
+  questionTopics: List<QuestionTopicEntity> = emptyList(),
+): PerformanceData {
   val average = if (attempts.isEmpty()) 0 else attempts.sumOf { it.timeTakenMs.coerceAtLeast(0) } / attempts.size
   return PerformanceData(
-    PerformanceSummary(attempts.size, attempts.count { it.isCorrect }, attempts.map { it.questionId }.distinct().size, questions.size, average),
-    attempts.accuracyTrend(),
-    attempts.speedTrend(),
-    buildWeakQuestions(questions, attempts)
+    summary = PerformanceSummary(attempts.size, attempts.count { it.isCorrect }, attempts.map { it.questionId }.distinct().size, questions.size, average),
+    trend = attempts.accuracyTrend(),
+    speedTrend = attempts.speedTrend(),
+    weakQuestions = buildWeakQuestions(questions, attempts),
+    topicPerformance = buildTopicPerformance(topics, questionTopics, attempts),
+    topicsNeedingRevision = buildTopicRevisionStates(topics, questionTopics, attempts),
+    studyVolume = attempts.studyVolume(),
+    consistency = attempts.studyConsistency(),
+    dailyActivity = attempts.dailyStudyActivity(),
   )
 }

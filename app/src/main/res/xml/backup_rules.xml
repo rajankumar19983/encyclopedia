@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+  <cloud-backup>
+    <!-- User-owned API credentials must never leave the device through Android backup. -->
+    <exclude domain="sharedpref" path="openai_secure_credentials.xml" />
+    <!-- SAF tree grants are installation-specific. After reinstall the user chooses
+         the existing backup folder again; stale content URIs must not be restored. -->
+    <exclude domain="sharedpref" path="backup_storage.xml" />
+  </cloud-backup>
+  <device-transfer>
+    <exclude domain="sharedpref" path="openai_secure_credentials.xml" />
+    <exclude domain="sharedpref" path="backup_storage.xml" />
+  </device-transfer>
+</data-extraction-rules>

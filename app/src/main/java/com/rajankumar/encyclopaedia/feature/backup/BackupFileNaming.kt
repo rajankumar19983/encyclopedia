@@ -5,15 +5,24 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-private const val BACKUP_FILE_PREFIX = "encyclopaedia-backup"
-private const val BACKUP_FILE_EXTENSION = "json"
+private const val BACKUP_FILE_PREFIX = "encyclopaedia_backup"
+private const val BACKUP_FILE_EXTENSION = "encbackup"
 
-fun backupFileName(createdAt: Long): String {
-  val formatter = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).apply {
+fun backupFileName(
+  createdAt: Long,
+  type: BackupType = BackupType.MANUAL,
+  formatVersion: Int = BACKUP_FORMAT_VERSION
+): String {
+  val formatter = SimpleDateFormat("yyyy-MM-dd_HHmmss", Locale.US).apply {
     timeZone = TimeZone.getTimeZone("UTC")
   }
-  return "$BACKUP_FILE_PREFIX-${formatter.format(Date(createdAt))}.$BACKUP_FILE_EXTENSION"
+  val typePart = type.name.lowercase(Locale.US)
+  return "${BACKUP_FILE_PREFIX}_${formatter.format(Date(createdAt))}_${typePart}_v$formatVersion.$BACKUP_FILE_EXTENSION"
 }
 
 fun isSupportedBackupFileName(name: String): Boolean =
-  name.startsWith("$BACKUP_FILE_PREFIX-") && name.endsWith(".$BACKUP_FILE_EXTENSION")
+  BACKUP_NAME_PATTERN.matches(name)
+
+private val BACKUP_NAME_PATTERN = Regex(
+  "^${BACKUP_FILE_PREFIX}_\\d{4}-\\d{2}-\\d{2}_\\d{6}_(automatic|manual)_v\\d+\\.${BACKUP_FILE_EXTENSION}$"
+)

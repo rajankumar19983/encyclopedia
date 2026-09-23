@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Quiz
@@ -24,6 +25,7 @@ enum class AppDestination(
   Practice("practice", "Practice", Icons.Default.Psychology),
   Revision("revision", "Revision", Icons.Default.Sync),
   Planner("planner", "Daily Planner", Icons.Default.CalendarMonth),
+  Notebook("notebook", "Notebook", Icons.Default.EditNote),
   Pyq("pyq", "PYQ Papers", Icons.Default.Description),
   Performance("performance", "Performance", Icons.Default.Analytics),
   Backup("backup", "Backup & Restore", Icons.Default.Backup),
