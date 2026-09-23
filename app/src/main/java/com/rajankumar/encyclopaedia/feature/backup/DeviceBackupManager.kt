@@ -1,6 +1,7 @@
 package com.rajankumar.encyclopaedia.feature.backup
 
 import android.net.Uri
+import com.rajankumar.encyclopaedia.feature.integrity.passesRestoreIntegrityGate
 
 /**
  * Coordinates portable device backups. A newly written backup is decoded and
@@ -13,7 +14,7 @@ class DeviceBackupManager(
     snapshot: BackupSnapshot,
     type: BackupType = BackupType.MANUAL
   ): BackupRestorePoint {
-    require(snapshot.isInternallyConsistent()) { "Backup snapshot is internally inconsistent" }
+    require(snapshot.passesRestoreIntegrityGate()) { "Backup snapshot failed integrity validation" }
     val effectiveSnapshot = snapshot.copy(
       manifest = snapshot.manifest.copy(backupType = type)
     )
@@ -26,7 +27,7 @@ class DeviceBackupManager(
 
     try {
       val verified = BackupCodec.decode(store.read(uri))
-      require(verified.manifest == effectiveSnapshot.manifest) {
+      require(verified.manifest == effectiveSnapshot.manifest && verified.passesRestoreIntegrityGate()) {
         "Backup verification failed"
       }
     } catch (error: Throwable) {
@@ -51,11 +52,13 @@ class DeviceBackupManager(
       createdAt = decoded?.manifest?.createdAt ?: file.lastModified,
       type = decoded?.manifest?.backupType ?: typeFromName(file.name),
       destination = BackupDestination.DEVICE,
-      valid = decoded != null
+      valid = decoded?.passesRestoreIntegrityGate() == true
     )
   }.sortedByDescending(BackupRestorePoint::createdAt)
 
-  fun load(uri: Uri): BackupSnapshot = BackupCodec.decode(store.read(uri))
+  fun load(uri: Uri): BackupSnapshot = BackupCodec.decode(store.read(uri)).also {
+    require(it.passesRestoreIntegrityGate()) { "Backup failed integrity validation" }
+  }
 
   private fun pruneAfterSuccessfulBackup() {
     val files = store.discover()
@@ -67,7 +70,7 @@ class DeviceBackupManager(
         createdAt = snapshot?.manifest?.createdAt ?: file.lastModified,
         type = snapshot?.manifest?.backupType ?: typeFromName(file.name),
         destination = BackupDestination.DEVICE,
-        valid = snapshot != null
+        valid = snapshot?.passesRestoreIntegrityGate() == true
       )
     }
     BackupRetention.removableAfterSuccessfulBackup(points).forEach { point ->
