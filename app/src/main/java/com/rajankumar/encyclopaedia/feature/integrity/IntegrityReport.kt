@@ -17,5 +17,5 @@ data class IntegrityReport(
 
 fun BackupSnapshot.integrityReport(): IntegrityReport = IntegrityReport(
   issues = integrityIssues(),
-  recordCount = knowledgeNodes.size + lessons.size + questions.size + questionTopics.size + attempts.size + plannerTasks.size + notebookPages.size + notebookLayers.size + notebookStrokes.size
+  recordCount = recordCount
 )
