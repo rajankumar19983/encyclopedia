@@ -14,6 +14,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -33,6 +34,9 @@ fun TeacherChatSheet(
   var input by remember { mutableStateOf("") }
   val messages = TeacherConversation.messages
   val context = TeacherContextStore.current
+  val contextSummary = context.summary()
+  val suggestions = teacherQuestionSuggestions(context)
+  val validation = validateTeacherInput(input)
 
   ModalBottomSheet(onDismissRequest = onDismiss) {
     Column(
@@ -40,16 +44,12 @@ fun TeacherChatSheet(
       verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Column {
+        Column(Modifier.weight(1f)) {
           Text("AI Teacher", style = MaterialTheme.typography.headlineSmall)
-          Text(
-            if (context == null) "Ask any study question" else "Using context from ${context.screen}",
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
+          Text(contextSummary.label, style = MaterialTheme.typography.titleSmall)
+          Text(contextSummary.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (messages.isNotEmpty()) {
-          TextButton(onClick = TeacherConversation::clear) { Text("Clear") }
-        }
+        if (messages.isNotEmpty()) TextButton(onClick = TeacherConversation::clear) { Text("Clear") }
       }
 
       LazyColumn(
@@ -57,25 +57,21 @@ fun TeacherChatSheet(
         verticalArrangement = Arrangement.spacedBy(8.dp)
       ) {
         if (messages.isEmpty()) {
-          item {
-            Text(
-              "Ask for an explanation, a simpler version, exam traps, or why an option is right or wrong.",
-              color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-          }
+          item { Text("Ask for an explanation, a simpler version, exam traps, or a concept check.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         items(messages, key = { it.id }) { message ->
           Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp)) {
-              Text(
-                if (message.role == TeacherMessageRole.STUDENT) "You" else "Teacher",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary
-              )
+              Text(if (message.role == TeacherMessageRole.STUDENT) "You" else "Teacher", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
               Text(message.text)
             }
           }
         }
+      }
+
+      Text("Try asking", style = MaterialTheme.typography.labelLarge)
+      suggestions.forEach { suggestion ->
+        SuggestionChip(onClick = { input = suggestion }, label = { Text(suggestion) })
       }
 
       OutlinedTextField(
@@ -83,23 +79,23 @@ fun TeacherChatSheet(
         onValueChange = { input = it },
         modifier = Modifier.fillMaxWidth(),
         label = { Text("Ask your teacher") },
+        supportingText = { if (!validation.valid && input.isNotEmpty()) Text(validation.message.orEmpty()) },
         minLines = 2,
         maxLines = 5
       )
+      Text(teacherPrivacyNotice(context), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
       Button(
         onClick = {
-          val question = input.trim()
-          if (question.isNotEmpty()) {
-            TeacherConversation.addStudentMessage(question)
-            onSend(createTeacherRequest(question))
+          val checked = validateTeacherInput(input)
+          if (checked.valid) {
+            TeacherConversation.addStudentMessage(checked.normalized)
+            onSend(createTeacherRequest(checked.normalized))
             input = ""
           }
         },
-        enabled = input.isNotBlank(),
+        enabled = validation.valid,
         modifier = Modifier.fillMaxWidth()
-      ) {
-        Text("Ask")
-      }
+      ) { Text("Ask") }
     }
   }
 }
