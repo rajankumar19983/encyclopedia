@@ -8,7 +8,8 @@ fun OcrSanitizationResult.summary(): OcrSanitizationSummary = OcrSanitizationSum
   noiseCount = removedLines.count { it.reason == "mostly OCR noise" },
 )
 
-fun OcrSanitizationSummary.message(): String? = when {
-  removedCount -> null
-  else -> "Excluded $removedCount suspect OCR lines from parsing • $devanagariCount Devanagari • $noiseCount noise."
+fun OcrSanitizationSummary.message(): String? = if (removedCount == 0) {
+  null
+} else {
+  "Excluded $removedCount suspect OCR lines from parsing • $devanagariCount Devanagari • $noiseCount noise."
 }
