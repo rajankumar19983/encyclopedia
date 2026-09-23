@@ -46,15 +46,16 @@ fun QuestionImportScreen(onDone: () -> Unit) {
   val pdfEngine = remember { PdfOcrEngine() }
   var drafts by remember { mutableStateOf<List<ReviewDraft>>(emptyList()) }
   var rawText by remember { mutableStateOf("") }
+  var preparation by remember { mutableStateOf<OcrImportPreparation?>(null) }
   var status by remember { mutableStateOf("Choose an image or PDF containing printed MCQs.") }
   var busy by remember { mutableStateOf(false) }
 
   fun review(text: String, source: String) {
     rawText = text
-    val metadata = OcrSourceMetadataExtractor.extract(text)
-    val parsed = OcrQuestionParser.parse(OcrLanguageFilter.removeDevanagariLines(text)).map { it.withQualityWarnings() }
-    drafts = parsed.map { ReviewDraft(it, source, metadata) }
-    status = importReviewStatus(parsed.reviewSummary())
+    val prepared = prepareOcrImport(text)
+    preparation = prepared
+    drafts = prepared.drafts.map { ReviewDraft(it, source, prepared.metadata) }
+    status = prepared.report().message()
   }
 
   val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -90,11 +91,18 @@ fun QuestionImportScreen(onDone: () -> Unit) {
       TextButton(onClick = onDone) { Text("Back") }
     }
     Text(status)
+    preparation?.let { prepared ->
+      prepared.sanitized.summary().message()?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+      prepared.diagnostics.message()?.let { Text("⚠ $it", color = MaterialTheme.colorScheme.error) }
+      prepared.sanitized.removedLinePreviews().forEach { removed ->
+        Text("Excluded: ${removed.text} — ${removed.reason}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+      }
+    }
     if (drafts.isNotEmpty()) Text(progress.message(), style = MaterialTheme.typography.bodyMedium)
     if (drafts.isEmpty() && rawText.isNotBlank()) Card(Modifier.fillMaxWidth()) {
       Column(Modifier.padding(16.dp)) {
         Text("OCR text for diagnosis", style = MaterialTheme.typography.titleMedium)
-        Text(OcrLanguageFilter.removeDevanagariLines(rawText).take(2500), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(preparation?.sanitized?.text?.take(2500).orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant)
       }
     }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -125,9 +133,7 @@ fun QuestionImportScreen(onDone: () -> Unit) {
                     source = initial.source, difficulty = "UNRATED"
                   ), null)
                   saveState = if (inserted) "SAVED" else "DUPLICATE"
-                  drafts = drafts.mapIndexed { i, draft ->
-                    if (i == index && inserted) draft.copy(decision = OcrReviewDecision.APPROVED) else draft
-                  }
+                  drafts = drafts.mapIndexed { i, draft -> if (i == index && inserted) draft.copy(decision = OcrReviewDecision.APPROVED) else draft }
                 }
               }) { Text(when (saveState) { "SAVING" -> "Checking…"; "SAVED" -> "Saved"; "DUPLICATE" -> "Already exists"; else -> "Approve & Save" }) }
               TextButton(enabled = initial.decision == OcrReviewDecision.PENDING, onClick = {
