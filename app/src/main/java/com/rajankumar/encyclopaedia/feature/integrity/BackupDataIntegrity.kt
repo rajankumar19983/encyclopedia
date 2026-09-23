@@ -7,7 +7,10 @@ fun BackupSnapshot.hasValidDomainFields(): Boolean =
     lessons.all { it.hasValidLessonFields() } &&
     questions.all { it.hasValidQuestionFields() } &&
     attempts.all { it.hasValidAttemptFields() } &&
-    plannerTasks.all { it.hasValidPlannerFields() }
+    plannerTasks.all { it.hasValidPlannerFields() } &&
+    notebookPages.all { it.hasValidNotebookPageFields() } &&
+    notebookLayers.all { it.hasValidNotebookLayerFields() } &&
+    notebookStrokes.all { it.hasValidNotebookStrokeFields() }
 
 fun BackupSnapshot.hasValidDomainIds(): Boolean = listOf(
   knowledgeNodes.map { it.id }, lessons.map { it.id }, questions.map { it.id }, attempts.map { it.id },
