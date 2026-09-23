@@ -5,15 +5,15 @@ data class BackupRestoreReviewSession(
   val warningsAcknowledged: Boolean
 ) {
   val canExecuteRestore: Boolean
-    get() = outcome.restoreEnabled && (!outcome.requiresWarningAcknowledgement || warningsAcknowledged)
+    get() = outcome.canRestore
 
   val acknowledgementRequired: Boolean
-    get() = outcome.requiresWarningAcknowledgement && !warningsAcknowledged
+    get() = outcome.requiresAcknowledgement
 }
 
 fun BackupInspection.restoreReviewSession(
   warningsAcknowledged: Boolean = false
 ): BackupRestoreReviewSession = BackupRestoreReviewSession(
-  outcome = restoreReviewOutcome(),
+  outcome = restoreReviewOutcome(warningsAcknowledged),
   warningsAcknowledged = warningsAcknowledged
 )
