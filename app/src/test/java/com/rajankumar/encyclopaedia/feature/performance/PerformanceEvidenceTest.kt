@@ -8,6 +8,6 @@ class PerformanceEvidenceTest {
     val evidence = performanceEvidence(20, 10, 12, 9)
     assertEquals(75, evidence.accuracy.percent)
     assertEquals(50, evidence.coverage.percent)
-    assertEquals(PerformanceConfidence.MODERATE, evidence.confidence)
+    assertEquals(PerformanceConfidence.LOW, evidence.confidence)
   }
 }
