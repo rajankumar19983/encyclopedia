@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.rajankumar.encyclopaedia.feature.integrity.IntegrityCheckSection
 
 @Composable
 fun BackupScreen() {
@@ -24,6 +26,9 @@ fun BackupScreen() {
     Text(defaultBackupScreenCopy.title, style = MaterialTheme.typography.headlineMedium)
     Text(defaultBackupScreenCopy.subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
     BackupSettingsSection()
+    HorizontalDivider()
+    IntegrityCheckSection()
+    HorizontalDivider()
     Text(BackupScreenSection.SAFETY.title, style = MaterialTheme.typography.titleMedium)
     backupSafetyPoints.forEach { point ->
       Text("• $point", color = MaterialTheme.colorScheme.onSurfaceVariant)
