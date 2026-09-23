@@ -8,6 +8,8 @@ data class IntegrityReport(
 ) {
   val valid: Boolean get() = issues.isEmpty()
   val messages: List<String> get() = issues.map { it.message() }
+  val details: List<IntegrityIssueDetail> get() = issues.map { it.detail() }
+  val issueCount: Int get() = issues.size
 }
 
 fun BackupSnapshot.integrityReport(): IntegrityReport = IntegrityReport(
