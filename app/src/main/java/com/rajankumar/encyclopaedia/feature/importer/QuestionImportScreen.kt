@@ -47,14 +47,9 @@ fun QuestionImportScreen(onDone: () -> Unit) {
   fun review(text: String, source: String) {
     rawText = text
     val metadata = OcrSourceMetadataExtractor.extract(text)
-    val parsed = OcrQuestionParser.parse(OcrLanguageFilter.removeDevanagariLines(text))
-    val summary = parsed.reviewSummary()
+    val parsed = OcrQuestionParser.parse(OcrLanguageFilter.removeDevanagariLines(text)).map { it.withQualityWarnings() }
     drafts = parsed.map { ReviewDraft(it, source, metadata) }
-    status = when {
-      parsed.isEmpty() -> "No reliably structured English MCQs were found. Nothing has been saved."
-      summary.needsAttention > 0 -> "${summary.total} drafts found • ${summary.needsAttention} need attention before approval."
-      else -> "${summary.total} drafts found and ready for review. Nothing is saved until you approve it."
-    }
+    status = importReviewStatus(parsed.reviewSummary())
   }
 
   val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -102,25 +97,24 @@ fun QuestionImportScreen(onDone: () -> Unit) {
         var answer by remember(initial) { mutableStateOf(initial.parsed.correctAnswer.orEmpty()) }
         var saveState by remember(initial) { mutableStateOf("READY") }
         val editable = EditableImportDraft(question, optionsText.lines(), answer)
+        val validation = editable.validateForSave()
         val options = editable.cleanedOptions
-        val normalizedAnswer = normalizedImportedAnswer(answer, options.size)
-        val valid = editable.isValid()
-        val metadataLabel = listOfNotNull(initial.metadata.examName, initial.metadata.year?.toString()).joinToString(" • ")
         Card(Modifier.fillMaxWidth()) {
           Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Draft ${index + 1} • ${initial.source}${if (metadataLabel.isBlank()) "" else " • $metadataLabel"}", style = MaterialTheme.typography.titleMedium)
-            if (initial.parsed.importReadiness() == ImportReadiness.NEEDS_ATTENTION) Text("Review required before saving", color = MaterialTheme.colorScheme.error)
-            initial.parsed.warnings.forEach { Text("⚠ $it", color = MaterialTheme.colorScheme.error) }
+            Text("Draft ${index + 1} • ${importSourceLabel(initial.source, initial.metadata)}", style = MaterialTheme.typography.titleMedium)
+            Text(sourceMetadataSummary(initial.metadata), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            validation.issues.forEach { Text("⚠ $it", color = MaterialTheme.colorScheme.error) }
             OutlinedTextField(question, { question = it }, label = { Text("Question") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(optionsText, { optionsText = it }, label = { Text("Options — one per line (2 or more)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+            editable.optionPreview().forEach { option -> Text("${option.label}. ${option.text}", style = MaterialTheme.typography.bodySmall) }
             OutlinedTextField(answer, { answer = it.take(2).uppercase() }, label = { Text("Correct option (A, B… or 1, 2…)") })
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-              Button(enabled = valid && saveState == "READY", onClick = {
+              Button(enabled = validation.canSave && saveState == "READY", onClick = {
                 saveState = "SAVING"
                 scope.launch {
                   val inserted = dao.saveImportedQuestionIfUnique(QuestionEntity(
                     id = UUID.randomUUID().toString(), questionText = question.trim(), options = options.joinToString("\n"),
-                    correctAnswer = normalizedAnswer.orEmpty(), explanation = initial.parsed.explanation,
+                    correctAnswer = validation.normalizedAnswer.orEmpty(), explanation = initial.parsed.explanation,
                     source = initial.source, difficulty = "UNRATED"
                   ), null)
                   saveState = if (inserted) "SAVED" else "DUPLICATE"
@@ -130,7 +124,7 @@ fun QuestionImportScreen(onDone: () -> Unit) {
             }
             when {
               saveState == "DUPLICATE" -> Text("This question and its options already exist in the Question Bank, so another copy was not created.", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-              !valid && saveState != "SAVED" -> Text("Review required: question, at least 2 options and a valid correct option are mandatory.", style = MaterialTheme.typography.bodySmall)
+              !validation.canSave && saveState != "SAVED" -> Text("Resolve every review warning before approving this question.", style = MaterialTheme.typography.bodySmall)
             }
           }
         }
