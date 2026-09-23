@@ -12,6 +12,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -34,7 +36,7 @@ private data class ReviewDraft(
   val parsed: ParsedQuestionDraft,
   val source: String,
   val metadata: OcrSourceMetadata,
-  val decision: OcrReviewDecision = OcrReviewDecision.PENDING,
+  val review: OcrDraftReviewState = OcrDraftReviewState(),
 )
 
 @Composable
@@ -44,11 +46,13 @@ fun QuestionImportScreen(onDone: () -> Unit) {
   val scope = rememberCoroutineScope()
   val imageEngine = remember { MlKitOcrEngine() }
   val pdfEngine = remember { PdfOcrEngine() }
+  val checklistItems = remember { ocrReviewChecklist() }
   var drafts by remember { mutableStateOf<List<ReviewDraft>>(emptyList()) }
   var rawText by remember { mutableStateOf("") }
   var preparation by remember { mutableStateOf<OcrImportPreparation?>(null) }
   var status by remember { mutableStateOf("Choose an image or PDF containing printed MCQs.") }
   var busy by remember { mutableStateOf(false) }
+  var filter by remember { mutableStateOf(OcrReviewFilter.ALL) }
 
   fun review(text: String, source: String) {
     rawText = text
@@ -81,7 +85,8 @@ fun QuestionImportScreen(onDone: () -> Unit) {
     }
   }
 
-  val progress = batchReviewProgress(drafts.map { it.decision })
+  val decisions = drafts.map { it.review.decision }
+  val summary = buildOcrReviewUiSummary(decisions)
   Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
     Text("Import Questions", style = MaterialTheme.typography.headlineMedium)
     Text("Printed English text only. Source images are not stored and OCR drafts are never saved automatically.", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -94,11 +99,17 @@ fun QuestionImportScreen(onDone: () -> Unit) {
     preparation?.let { prepared ->
       prepared.sanitized.summary().message()?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
       prepared.diagnostics.message()?.let { Text("⚠ $it", color = MaterialTheme.colorScheme.error) }
-      prepared.sanitized.removedLinePreviews().forEach { removed ->
-        Text("Excluded: ${removed.text} — ${removed.reason}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+      prepared.sanitized.removedLinePreviews().forEach { removed -> Text("Excluded: ${removed.text} — ${removed.reason}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+    if (drafts.isNotEmpty()) {
+      Text(summary.headline, style = MaterialTheme.typography.titleMedium)
+      Text(summary.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
+      Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        OcrReviewFilter.entries.forEach { choice ->
+          FilterChip(selected = filter == choice, onClick = { filter = choice }, label = { Text("${choice.name.lowercase().replaceFirstChar { it.uppercase() }} (${choice.count(decisions)})") })
+        }
       }
     }
-    if (drafts.isNotEmpty()) Text(progress.message(), style = MaterialTheme.typography.bodyMedium)
     if (drafts.isEmpty() && rawText.isNotBlank()) Card(Modifier.fillMaxWidth()) {
       Column(Modifier.padding(16.dp)) {
         Text("OCR text for diagnosis", style = MaterialTheme.typography.titleMedium)
@@ -107,44 +118,66 @@ fun QuestionImportScreen(onDone: () -> Unit) {
     }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
       itemsIndexed(drafts) { index, initial ->
-        var question by remember(initial.parsed) { mutableStateOf(initial.parsed.questionText) }
-        var optionsText by remember(initial.parsed) { mutableStateOf(initial.parsed.options.joinToString("\n")) }
-        var answer by remember(initial.parsed) { mutableStateOf(initial.parsed.correctAnswer.orEmpty()) }
-        var saveState by remember(initial.parsed) { mutableStateOf("READY") }
-        val editable = EditableImportDraft(question, optionsText.lines(), answer)
-        val validation = editable.validateForSave()
-        val options = editable.cleanedOptions
+        if (!filter.matches(initial.review.decision)) return@itemsIndexed
+        var edit by remember(initial.parsed) { mutableStateOf(initial.parsed.toEditState()) }
+        val validation = edit.validation()
+        val gate = evaluateOcrApproval(validation, initial.review.checklist, checklistItems)
+        val options = edit.editable().cleanedOptions
         Card(Modifier.fillMaxWidth()) {
           Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Draft ${index + 1} • ${importSourceLabel(initial.source, initial.metadata)}", style = MaterialTheme.typography.titleMedium)
+            Text(initial.review.decision.accessibilityLabel(index + 1), style = MaterialTheme.typography.bodySmall)
             Text(sourceMetadataSummary(initial.metadata), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             validation.issues.forEach { Text("⚠ $it", color = MaterialTheme.colorScheme.error) }
-            OutlinedTextField(question, { question = it }, label = { Text("Question") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(optionsText, { optionsText = it }, label = { Text("Options — one per line (2 or more)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
-            editable.optionPreview().forEach { option -> Text("${option.label}. ${option.text}", style = MaterialTheme.typography.bodySmall) }
-            OutlinedTextField(answer, { answer = it.take(2).uppercase() }, label = { Text("Correct option (A, B… or 1, 2…)") })
+            OutlinedTextField(edit.question, { edit = edit.copy(question = it) }, label = { Text("Question") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(edit.optionsText, { edit = edit.copy(optionsText = it) }, label = { Text("Options — one per line (2 or more)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+            edit.editable().optionPreview().forEach { option -> Text("${option.label}. ${option.text}", style = MaterialTheme.typography.bodySmall) }
+            OutlinedTextField(edit.answer, { edit = edit.copy(answer = it.take(2).uppercase()) }, label = { Text("Correct option (A, B… or 1, 2…)") })
+            Text("Manual verification", style = MaterialTheme.typography.titleSmall)
+            checklistItems.forEachIndexed { checkIndex, item ->
+              Row {
+                Checkbox(
+                  checked = checkIndex in initial.review.checklist.checked,
+                  enabled = initial.review.decision == OcrReviewDecision.PENDING,
+                  onCheckedChange = {
+                    drafts = drafts.mapIndexed { i, draft -> if (i == index) draft.copy(review = draft.review.copy(checklist = draft.review.checklist.toggle(checkIndex))) else draft }
+                  },
+                )
+                Text(item.label + if (item.required) " *" else "", modifier = Modifier.padding(top = 12.dp))
+              }
+            }
+            val checklistProgress = initial.review.checklist.progress(checklistItems)
+            Text("Required checks: ${checklistProgress.completed}/${checklistProgress.required}", style = MaterialTheme.typography.bodySmall)
+            gate.reasons.forEach { Text("⚠ $it", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-              Button(enabled = validation.canSave && saveState == "READY" && initial.decision == OcrReviewDecision.PENDING, onClick = {
-                saveState = "SAVING"
+              Button(enabled = gate.allowed && initial.review.saveStatus != OcrDraftSaveStatus.SAVING && initial.review.decision == OcrReviewDecision.PENDING, onClick = {
+                drafts = drafts.mapIndexed { i, draft -> if (i == index) draft.copy(review = draft.review.copy(saveStatus = OcrDraftSaveStatus.SAVING)) else draft }
                 scope.launch {
-                  val inserted = dao.saveImportedQuestionIfUnique(QuestionEntity(
-                    id = UUID.randomUUID().toString(), questionText = question.trim(), options = options.joinToString("\n"),
-                    correctAnswer = validation.normalizedAnswer.orEmpty(), explanation = initial.parsed.explanation,
-                    source = initial.source, difficulty = "UNRATED"
-                  ), null)
-                  saveState = if (inserted) "SAVED" else "DUPLICATE"
-                  drafts = drafts.mapIndexed { i, draft -> if (i == index && inserted) draft.copy(decision = OcrReviewDecision.APPROVED) else draft }
+                  runCatching {
+                    dao.saveImportedQuestionIfUnique(QuestionEntity(
+                      id = UUID.randomUUID().toString(), questionText = edit.question.trim(), options = options.joinToString("\n"),
+                      correctAnswer = validation.normalizedAnswer.orEmpty(), explanation = initial.parsed.explanation,
+                      source = initial.source, difficulty = "UNRATED"
+                    ), null)
+                  }.onSuccess { inserted ->
+                    drafts = drafts.mapIndexed { i, draft -> if (i == index) draft.copy(review = draft.review.copy(
+                      decision = if (inserted) OcrReviewDecision.APPROVED else draft.review.decision,
+                      saveStatus = if (inserted) OcrDraftSaveStatus.SAVED else OcrDraftSaveStatus.DUPLICATE,
+                    )) else draft }
+                  }.onFailure {
+                    drafts = drafts.mapIndexed { i, draft -> if (i == index) draft.copy(review = draft.review.copy(saveStatus = OcrDraftSaveStatus.FAILED)) else draft }
+                  }
                 }
-              }) { Text(when (saveState) { "SAVING" -> "Checking…"; "SAVED" -> "Saved"; "DUPLICATE" -> "Already exists"; else -> "Approve & Save" }) }
-              TextButton(enabled = initial.decision == OcrReviewDecision.PENDING, onClick = {
-                drafts = drafts.mapIndexed { i, draft -> if (i == index) draft.copy(decision = OcrReviewDecision.REJECTED) else draft }
-              }) { Text(if (initial.decision == OcrReviewDecision.REJECTED) "Rejected" else "Reject") }
+              }) { Text(initial.review.saveStatus.label()) }
+              TextButton(enabled = initial.review.decision == OcrReviewDecision.PENDING, onClick = {
+                drafts = drafts.mapIndexed { i, draft -> if (i == index) draft.copy(review = draft.review.copy(decision = OcrReviewDecision.REJECTED)) else draft }
+              }) { Text(if (initial.review.decision == OcrReviewDecision.REJECTED) "Rejected" else "Reject") }
             }
             when {
-              initial.decision == OcrReviewDecision.APPROVED -> Text("Approved and saved to the Question Bank.", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-              initial.decision == OcrReviewDecision.REJECTED -> Text("Rejected. This OCR draft was not saved.", style = MaterialTheme.typography.bodySmall)
-              saveState == "DUPLICATE" -> Text("This question and its options already exist in the Question Bank, so another copy was not created.", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-              !validation.canSave -> Text("Resolve every review warning before approving this question.", style = MaterialTheme.typography.bodySmall)
+              initial.review.decision == OcrReviewDecision.APPROVED -> Text("Approved and saved to the Question Bank.", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+              initial.review.decision == OcrReviewDecision.REJECTED -> Text("Rejected. This OCR draft was not saved.", style = MaterialTheme.typography.bodySmall)
+              initial.review.saveStatus == OcrDraftSaveStatus.DUPLICATE -> Text("This question and its options already exist, so another copy was not created.", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+              initial.review.saveStatus == OcrDraftSaveStatus.FAILED -> Text("Saving failed. Your reviewed draft remains here so you can retry.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
           }
         }
