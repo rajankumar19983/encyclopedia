@@ -1,17 +1,10 @@
 package com.rajankumar.encyclopaedia.feature.integrity
 
 import com.rajankumar.encyclopaedia.feature.backup.BackupSnapshot
-import com.rajankumar.encyclopaedia.feature.backup.isSafeToRestore
 
-fun BackupSnapshot.passesRestoreIntegrityGate(): Boolean =
-  isSafeToRestore() &&
-    hasValidDomainIds() &&
-    hasValidDomainFields() &&
-    hasValidKnowledgeHierarchy() &&
-    hasUniqueQuestionTopics() &&
-    hasValidStudyRelationships() &&
-    hasValidNotebookRelationships()
+fun BackupSnapshot.passesRestoreIntegrityGate(): Boolean = integrityIssues().isEmpty()
 
 fun BackupSnapshot.requireRestoreIntegrity() {
-  require(passesRestoreIntegrityGate()) { "Backup failed integrity validation and cannot be restored." }
+  val issues = integrityIssues()
+  require(issues.isEmpty()) { "Backup failed integrity validation: ${issues.joinToString()}" }
 }
