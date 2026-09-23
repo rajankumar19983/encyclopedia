@@ -10,7 +10,7 @@ class IntegrityCheckDetailOrderingTest {
       setOf(IntegrityIssue.FIELDS, IntegrityIssue.STUDY_RELATIONSHIPS, IntegrityIssue.IDS),
       12
     ).toCheckPresentation()
-    assertEquals(IntegritySeverity.ERROR, presentation.details.first().severity)
-    assertTrue(presentation.details.dropWhile { it.severity == IntegritySeverity.ERROR }.all { it.severity == IntegritySeverity.WARNING })
+    assertEquals(IntegritySeverity.ERROR, presentation.items.first().severity)
+    assertTrue(presentation.items.dropWhile { it.severity == IntegritySeverity.ERROR }.all { it.severity == IntegritySeverity.WARNING })
   }
 }
