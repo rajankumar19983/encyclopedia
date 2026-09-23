@@ -5,26 +5,27 @@ import org.junit.Test
 
 class IntegrityReportTest {
   @Test
-  fun validReportHasNoMessages() {
+  fun validReportHasNoIssues() {
     val report = IntegrityReport(emptySet(), 12)
     assertTrue(report.valid)
-    assertTrue(report.messages.isEmpty())
-    assertTrue(report.details.isEmpty())
+    assertFalse(report.hasBlockingIssues)
     assertEquals(0, report.issueCount)
+    assertEquals(0, report.errorCount)
+    assertEquals(0, report.warningCount)
     assertEquals(12, report.recordCount)
   }
 
   @Test
-  fun invalidReportExposesIssueMessagesAndDetails() {
+  fun reportSeparatesErrorsFromWarnings() {
     val report = IntegrityReport(
-      linkedSetOf(IntegrityIssue.IDS, IntegrityIssue.FIELDS),
+      linkedSetOf(IntegrityIssue.IDS, IntegrityIssue.FIELDS, IntegrityIssue.QUESTION_TOPICS),
       3
     )
     assertFalse(report.valid)
-    assertEquals(2, report.issueCount)
-    assertEquals(2, report.messages.size)
-    assertEquals(listOf(IntegrityIssue.IDS, IntegrityIssue.FIELDS), report.details.map { it.issue })
-    assertTrue(report.messages.any { "identifier" in it })
-    assertTrue(report.messages.any { "fields" in it })
+    assertTrue(report.hasBlockingIssues)
+    assertEquals(3, report.issueCount)
+    assertEquals(1, report.errorCount)
+    assertEquals(2, report.warningCount)
+    assertEquals(IntegritySeverity.ERROR, report.details.first().severity)
   }
 }

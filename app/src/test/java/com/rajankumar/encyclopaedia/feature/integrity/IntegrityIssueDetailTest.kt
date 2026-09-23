@@ -5,9 +5,10 @@ import org.junit.Test
 
 class IntegrityIssueDetailTest {
   @Test
-  fun detailKeepsIssueAndReadableMessage() {
+  fun detailKeepsIssueSeverityAndReadableMessage() {
     val detail = IntegrityIssue.KNOWLEDGE_HIERARCHY.detail()
     assertEquals(IntegrityIssue.KNOWLEDGE_HIERARCHY, detail.issue)
+    assertEquals(IntegritySeverity.ERROR, detail.severity)
     assertTrue(detail.message.contains("hierarchy", ignoreCase = true))
   }
 
