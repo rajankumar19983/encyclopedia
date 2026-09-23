@@ -29,7 +29,9 @@ class BackupRestoreReviewSectionTest {
     assertTrue(sections[0].hasBlockingIssues)
     assertEquals(1, sections[1].warningCount)
     assertFalse(sections[1].hasBlockingIssues)
-    assertEquals(2, sections[2].warningCount)
+    assertEquals(1, sections[2].errorCount)
+    assertEquals(1, sections[2].warningCount)
+    assertTrue(sections[2].hasBlockingIssues)
   }
 
   @Test
