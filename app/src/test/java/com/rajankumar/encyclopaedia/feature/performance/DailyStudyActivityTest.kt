@@ -12,9 +12,9 @@ class DailyStudyActivityTest {
     val day = LocalDate.of(2026, 9, 23)
     val start = day.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
     val attempts = listOf(
-      attempt(1, start + 1_000, true, 2_000),
-      attempt(2, start + 2_000, false, 3_000),
-      attempt(3, start + 86_400_000 + 1_000, true, 4_000),
+      attempt("1", start + 1_000, true, 2_000),
+      attempt("2", start + 2_000, false, 3_000),
+      attempt("3", start + 86_400_000 + 1_000, true, 4_000),
     )
 
     val activity = attempts.dailyStudyActivity(ZoneOffset.UTC)
@@ -22,17 +22,18 @@ class DailyStudyActivityTest {
     assertEquals(2, activity.size)
     assertEquals(2, activity[0].attempts)
     assertEquals(1, activity[0].correct)
-    assertEquals(5_000, activity[0].totalTimeMs)
+    assertEquals(5_000L, activity[0].totalTimeMs)
     assertEquals(50, activity[0].accuracyPercent)
     assertEquals(day.plusDays(1), activity[1].date)
   }
 
-  private fun attempt(id: Long, at: Long, correct: Boolean, duration: Long) = QuestionAttemptEntity(
+  private fun attempt(id: String, at: Long, correct: Boolean, duration: Long) = QuestionAttemptEntity(
     id = id,
-    questionId = id,
-    selectedOptionId = null,
+    questionId = "q-$id",
+    sessionId = "session",
+    selectedAnswer = "A",
     isCorrect = correct,
-    attemptedAt = at,
     timeTakenMs = duration,
+    attemptedAt = at,
   )
 }
