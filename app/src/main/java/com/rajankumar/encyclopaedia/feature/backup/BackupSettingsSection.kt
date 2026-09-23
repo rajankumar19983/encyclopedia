@@ -33,12 +33,30 @@ fun BackupSettingsSection() {
   var busy by remember { mutableStateOf(false) }
   var status by remember { mutableStateOf(if (configured) "Backup folder configured." else "Reinstalled the app? Choose your previous backup folder to find existing restore points.") }
   var restorePoints by remember { mutableStateOf(runCatching { manager.discoverRestorePoints() }.getOrDefault(emptyList())) }
-  var pendingRestore by remember { mutableStateOf<BackupRestorePoint?>(null) }
+  var restoreCandidate by remember { mutableStateOf<BackupRestoreCandidate?>(null) }
   var pendingDelete by remember { mutableStateOf<BackupRestorePoint?>(null) }
   var confirmDeleteAll by remember { mutableStateOf(false) }
   var discoveredAfterReconnect by remember { mutableStateOf<List<BackupRestorePoint>>(emptyList()) }
 
   fun refresh() { restorePoints = runCatching { manager.discoverRestorePoints() }.getOrDefault(emptyList()) }
+  fun reviewForRestore(point: BackupRestorePoint) {
+    busy = true
+    status = "Inspecting backup before restore…"
+    scope.launch {
+      runCatching { withContext(Dispatchers.IO) { manager.prepareRestore(point) } }
+        .onSuccess { candidate ->
+          restoreCandidate = candidate
+          val model = candidate.inspection.restoreReviewModel()
+          status = when {
+            model.blockingIssueCount > 0 -> "Restore blocked: ${model.blockingIssueCount} integrity issue${if (model.blockingIssueCount == 1) "" else "s"} must not be restored."
+            model.warningCount > 0 -> "Backup inspected. Review ${model.warningCount} warning${if (model.warningCount == 1) "" else "s"} before restoring."
+            else -> "Backup inspected and ready to restore."
+          }
+        }
+        .onFailure { status = "Could not inspect backup: ${it.message ?: "unknown error"}." }
+      busy = false
+    }
+  }
 
   val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
     if (uri != null) runCatching { store.setDirectory(uri) }.onSuccess {
@@ -59,8 +77,7 @@ fun BackupSettingsSection() {
     Text(status, color = MaterialTheme.colorScheme.onSurfaceVariant)
     OutlinedButton(onClick = { folderPicker.launch(store.configuredDirectory()) }) { Text(if (configured) "Change backup location" else "Choose or reconnect backup location") }
     Button(enabled = configured && !busy, onClick = {
-      busy = true
-      status = "Creating backup…"
+      busy = true; status = "Creating backup…"
       scope.launch {
         runCatching { withContext(Dispatchers.IO) { manager.create(createBackupSnapshot(EncyclopaediaDatabase.get(context).dao()), BackupType.MANUAL) } }
           .onSuccess { point -> refresh(); status = "Backup created: ${point.name}" }
@@ -74,7 +91,7 @@ fun BackupSettingsSection() {
     restorePoints.take(MAX_RESTORE_POINTS).forEach { point ->
       Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text("${if (point.valid) "✓" else "⚠"} ${point.name}", style = MaterialTheme.typography.bodySmall, color = if (point.valid) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error)
-        if (point.valid) OutlinedButton(enabled = !busy, onClick = { pendingRestore = point }) { Text("Restore this backup") }
+        if (point.valid) OutlinedButton(enabled = !busy, onClick = { reviewForRestore(point) }) { Text("Inspect & restore") }
         TextButton(enabled = !busy, onClick = { pendingDelete = point }) { Text("Delete backup", color = MaterialTheme.colorScheme.error) }
       }
     }
@@ -86,13 +103,12 @@ fun BackupSettingsSection() {
 
   if (discoveredAfterReconnect.isNotEmpty()) {
     val newest = discoveredAfterReconnect.first()
-    AlertDialog(onDismissRequest = { discoveredAfterReconnect = emptyList() }, title = { Text("Existing backups found") }, text = { Text("Found ${discoveredAfterReconnect.size} valid restore point${if (discoveredAfterReconnect.size == 1) "" else "s"}. The newest is ${newest.name}. You can restore it now or choose another version from the list.") }, confirmButton = { TextButton(onClick = { discoveredAfterReconnect = emptyList(); pendingRestore = newest }) { Text("Restore newest") } }, dismissButton = { TextButton(onClick = { discoveredAfterReconnect = emptyList() }) { Text("Choose another") } })
+    AlertDialog(onDismissRequest = { discoveredAfterReconnect = emptyList() }, title = { Text("Existing backups found") }, text = { Text("Found ${discoveredAfterReconnect.size} valid restore point${if (discoveredAfterReconnect.size == 1) "" else "s"}. The newest is ${newest.name}. It will be inspected before restore.") }, confirmButton = { TextButton(onClick = { discoveredAfterReconnect = emptyList(); reviewForRestore(newest) }) { Text("Inspect newest") } }, dismissButton = { TextButton(onClick = { discoveredAfterReconnect = emptyList() }) { Text("Choose another") } })
   }
 
   pendingDelete?.let { point ->
     AlertDialog(onDismissRequest = { pendingDelete = null }, title = { Text("Delete this backup?") }, text = { Text("${point.name} will be permanently deleted from the selected backup location. This cannot be undone.") }, confirmButton = { TextButton(onClick = {
-      pendingDelete = null
-      busy = true
+      pendingDelete = null; busy = true
       scope.launch {
         runCatching { withContext(Dispatchers.IO) { store.deleteByName(point.name) } }.onSuccess { deleted -> refresh(); status = if (deleted) "Backup deleted." else "Backup was not found." }.onFailure { status = it.message ?: "Could not delete backup." }
         busy = false
@@ -102,8 +118,7 @@ fun BackupSettingsSection() {
 
   if (confirmDeleteAll) {
     AlertDialog(onDismissRequest = { confirmDeleteAll = false }, title = { Text("Delete all backup data?") }, text = { Text("Every Encyclopaedia backup in the selected location will be permanently deleted. Your current in-app study data is not deleted, but you will lose these recovery versions.") }, confirmButton = { TextButton(onClick = {
-      confirmDeleteAll = false
-      busy = true
+      confirmDeleteAll = false; busy = true
       scope.launch {
         runCatching { withContext(Dispatchers.IO) { store.deleteAllBackups() } }.onSuccess { count -> refresh(); status = "Deleted $count backup${if (count == 1) "" else "s"}." }.onFailure { status = it.message ?: "Could not delete backups." }
         busy = false
@@ -111,18 +126,21 @@ fun BackupSettingsSection() {
     }) { Text("Delete all permanently", color = MaterialTheme.colorScheme.error) } }, dismissButton = { TextButton(onClick = { confirmDeleteAll = false }) { Text("Cancel") } })
   }
 
-  pendingRestore?.let { point ->
-    AlertDialog(onDismissRequest = { pendingRestore = null }, title = { Text("Restore this backup?") }, text = { Text("Your current study data will be replaced with ${point.name}. A safety backup of the current data will be created first.") }, confirmButton = { TextButton(onClick = {
-      pendingRestore = null; busy = true; status = "Creating safety backup before restore…"
-      scope.launch {
-        runCatching { withContext(Dispatchers.IO) {
-          val dao = EncyclopaediaDatabase.get(context).dao()
-          manager.create(createBackupSnapshot(dao), BackupType.MANUAL)
-          val file = store.discover().firstOrNull { it.name == point.name } ?: error("Selected backup file is no longer available")
-          dao.restoreSnapshot(manager.load(file.uri))
-        } }.onSuccess { refresh(); status = "Restore completed successfully. A pre-restore safety backup was kept." }.onFailure { status = "Restore stopped: ${it.message ?: "unknown error"}." }
-        busy = false
+  restoreCandidate?.let { candidate ->
+    BackupRestoreReviewDialog(
+      candidate = candidate,
+      onDismiss = { restoreCandidate = null },
+      onRestore = {
+        restoreCandidate = null; busy = true; status = "Creating safety backup before restore…"
+        scope.launch {
+          runCatching { withContext(Dispatchers.IO) {
+            val dao = EncyclopaediaDatabase.get(context).dao()
+            manager.create(createBackupSnapshot(dao), BackupType.MANUAL)
+            dao.restoreSnapshot(manager.load(candidate.uri))
+          } }.onSuccess { refresh(); status = "Restore completed successfully. A pre-restore safety backup was kept." }.onFailure { status = "Restore stopped: ${it.message ?: "unknown error"}." }
+          busy = false
+        }
       }
-    }) { Text("Create safety backup & restore") } }, dismissButton = { TextButton(onClick = { pendingRestore = null }) { Text("Cancel") } })
+    )
   }
 }
