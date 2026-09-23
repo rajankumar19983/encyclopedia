@@ -16,6 +16,7 @@ data class PerformanceData(
   val topicsNeedingRevision: List<TopicRevisionState> = emptyList(),
   val studyVolume: StudyVolume = StudyVolume(0, 0, 0, 0),
   val consistency: StudyConsistency = StudyConsistency(0, 0, 0),
+  val dailyActivity: List<DailyStudyActivity> = emptyList(),
 )
 
 fun buildPerformanceData(
@@ -34,5 +35,6 @@ fun buildPerformanceData(
     topicsNeedingRevision = buildTopicRevisionStates(topics, questionTopics, attempts),
     studyVolume = attempts.studyVolume(),
     consistency = attempts.studyConsistency(),
+    dailyActivity = attempts.dailyStudyActivity(),
   )
 }
