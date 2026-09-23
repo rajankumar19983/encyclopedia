@@ -8,6 +8,7 @@ fun BackupSnapshot.passesRestoreIntegrityGate(): Boolean =
     hasValidDomainIds() &&
     hasValidDomainFields() &&
     hasValidKnowledgeHierarchy() &&
+    hasUniqueQuestionTopics() &&
     hasValidStudyRelationships() &&
     hasValidNotebookRelationships()
 
