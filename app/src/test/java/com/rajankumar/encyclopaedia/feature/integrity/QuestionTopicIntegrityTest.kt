@@ -6,8 +6,41 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class QuestionTopicIntegrityTest {
-  private fun snapshot(topics: List<QuestionTopicEntity>) = BackupSnapshot(BackupManifest(1L, 0, 0, 0, topics.size, 0, 0), emptyList(), emptyList(), emptyList(), topics, emptyList(), emptyList())
-  @Test fun acceptsUniquePairs() = assertTrue(snapshot(listOf(QuestionTopicEntity("q", "n"))).hasUniqueQuestionTopics())
-  @Test fun rejectsDuplicatePairs() = assertFalse(snapshot(listOf(QuestionTopicEntity("q", "n"), QuestionTopicEntity("q", "n"))).hasUniqueQuestionTopics())
-  @Test fun rejectsBlankPair() = assertFalse(snapshot(listOf(QuestionTopicEntity("", "n"))).hasUniqueQuestionTopics())
+  private fun snapshot(topics: List<QuestionTopicEntity>) = BackupSnapshot(
+    manifest = BackupManifest(
+      createdAt = 1L,
+      knowledgeNodeCount = 0,
+      lessonCount = 0,
+      questionCount = 0,
+      questionTopicCount = topics.size,
+      attemptCount = 0,
+      plannerTaskCount = 0
+    ),
+    knowledgeNodes = emptyList(),
+    lessons = emptyList(),
+    questions = emptyList(),
+    questionTopics = topics,
+    attempts = emptyList(),
+    plannerTasks = emptyList()
+  )
+
+  @Test
+  fun acceptsUniquePairs() = assertTrue(
+    snapshot(listOf(QuestionTopicEntity("q", "n"))).hasUniqueQuestionTopics()
+  )
+
+  @Test
+  fun rejectsDuplicatePairs() = assertFalse(
+    snapshot(
+      listOf(
+        QuestionTopicEntity("q", "n"),
+        QuestionTopicEntity("q", "n")
+      )
+    ).hasUniqueQuestionTopics()
+  )
+
+  @Test
+  fun rejectsBlankPair() = assertFalse(
+    snapshot(listOf(QuestionTopicEntity("", "n"))).hasUniqueQuestionTopics()
+  )
 }
