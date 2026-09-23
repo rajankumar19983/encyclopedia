@@ -10,6 +10,6 @@ enum class BackupRestoreReadiness {
 fun BackupInspection.restoreReadiness(): BackupRestoreReadiness = when {
   !preflight.canRestore -> BackupRestoreReadiness.BLOCKED_BY_COMPATIBILITY
   integrity?.hasBlockingIssues == true -> BackupRestoreReadiness.BLOCKED_BY_INTEGRITY
-  integrity?.hasWarnings == true -> BackupRestoreReadiness.REVIEW_WARNINGS
+  integrity?.warningCount?.let { it > 0 } == true -> BackupRestoreReadiness.REVIEW_WARNINGS
   else -> BackupRestoreReadiness.READY
 }
