@@ -50,7 +50,7 @@ fun QuestionImportScreen(onDone: () -> Unit) {
   var rawText by remember { mutableStateOf("") }
   var preparation by remember { mutableStateOf<OcrImportPreparation?>(null) }
   var extractionNotices by remember { mutableStateOf<List<String>>(emptyList()) }
-  var status by remember { mutableStateOf("Choose an image or PDF containing printed MCQs.") }
+  var status by remember { mutableStateOf("Choose one or more images, or a PDF containing printed MCQs.") }
   var busy by remember { mutableStateOf(false) }
   var filter by remember { mutableStateOf(OcrReviewFilter.ALL) }
 
@@ -62,19 +62,22 @@ fun QuestionImportScreen(onDone: () -> Unit) {
     preparation = prepared
     drafts = prepared.drafts.map { ReviewDraft(it, source, prepared.metadata) }
     status = when {
-      document.extraction.failedPages.isNotEmpty() -> "OCR completed with ${document.extraction.failedPages.size} page failure(s). Review warnings below."
+      document.extraction.failedPages.isNotEmpty() -> "OCR completed with ${document.extraction.failedPages.size} source failure(s). Review warnings below."
       prepared.drafts.isEmpty() -> "OCR completed, but no reviewable MCQs were parsed."
       else -> prepared.report().message()
     }
   }
 
-  val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-    if (uri != null) {
+  val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+    if (uris.isNotEmpty()) {
       busy = true
-      status = "Reading printed text from image…"
+      status = "Reading ${uris.size} image${if (uris.size == 1) "" else "s"}…"
       scope.launch {
-        runCatching { documentImporter.importImage(uri) }
-          .onSuccess { review(it, "SCAN") }
+        runCatching {
+          documentImporter.importImages(uris) { progress ->
+            status = "Reading image ${progress.completed} of ${progress.total}…"
+          }
+        }.onSuccess { review(it, "SCAN") }
           .onFailure { status = "Image OCR failed: ${it.message ?: "unknown error"}" }
         busy = false
       }
@@ -97,9 +100,9 @@ fun QuestionImportScreen(onDone: () -> Unit) {
   val summary = buildOcrReviewUiSummary(decisions)
   Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
     Text("Import Questions", style = MaterialTheme.typography.headlineMedium)
-    Text("Printed English text only. Source images are not stored and OCR drafts are never saved automatically.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text("Printed English text only. Select multiple images when a question set spans several scans. Source images are not stored and OCR drafts are never saved automatically.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-      Button(onClick = { imagePicker.launch("image/*") }, enabled = !busy) { Text("Choose Image") }
+      Button(onClick = { imagePicker.launch("image/*") }, enabled = !busy) { Text("Choose Images") }
       Button(onClick = { pdfPicker.launch("application/pdf") }, enabled = !busy) { Text("Choose PDF") }
       TextButton(onClick = onDone) { Text("Back") }
     }
