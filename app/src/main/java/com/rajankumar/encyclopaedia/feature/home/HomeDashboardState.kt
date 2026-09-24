@@ -4,7 +4,8 @@ data class HomeDashboardState(
   val stats: List<HomeStatModel>,
   val status: HomeStudyStatus,
   val recommendation: HomePlanRecommendation,
-  val motivation: String
+  val motivation: String,
+  val emptyState: HomeEmptyState
 )
 
 fun buildHomeDashboardState(topicCount: Int, questionCount: Int, attemptCount: Int, correctCount: Int, practisedCount: Int): HomeDashboardState {
@@ -14,6 +15,7 @@ fun buildHomeDashboardState(topicCount: Int, questionCount: Int, attemptCount: I
     stats = buildHomeStatModels(topicCount, questionCount, attemptCount, correctCount, practisedCount),
     status = status,
     recommendation = recommendHomePlan(questionCount, attemptCount, metrics.coveragePercent, metrics.accuracyPercent),
-    motivation = homeMotivation(status)
+    motivation = homeMotivation(status),
+    emptyState = homeEmptyState(topicCount, questionCount)
   )
 }
