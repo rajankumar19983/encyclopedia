@@ -21,6 +21,7 @@ fun QuestionEditorScreen(onDone: () -> Unit) {
   var explanation by remember { mutableStateOf("") }
   var status by remember { mutableStateOf<String?>(null) }
   val draft = ManualQuestionDraft(question, options, answer, explanation)
+  val started = question.isNotBlank() || options.isNotBlank() || answer.isNotBlank()
 
   Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
     Text("Question Editor", style = MaterialTheme.typography.headlineMedium)
@@ -29,15 +30,14 @@ fun QuestionEditorScreen(onDone: () -> Unit) {
     OutlinedTextField(options, { options = it; status = null }, label = { Text("Options — one per line (2–6)") }, modifier = Modifier.fillMaxWidth(), minLines = 4)
     OutlinedTextField(answer, { answer = it.take(2).uppercase(); status = null }, label = { Text("Correct option (A, B… or 1, 2…)") })
     OutlinedTextField(explanation, { explanation = it }, label = { Text("Explanation (optional)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
-    if (!draft.isValid() && (question.isNotBlank() || options.isNotBlank() || answer.isNotBlank())) Text("Enter a question, 2–6 options, and an answer that points to one of those options.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+    if (started) draft.validationMessage()?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
     status?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
       Button(enabled = draft.isValid(), onClick = {
         scope.launch {
           val inserted = dao.saveImportedQuestionIfUnique(QuestionEntity(UUID.randomUUID().toString(), question.trim(), draft.options.joinToString("\n"), draft.normalizedAnswer, explanation.trim(), "USER", "UNRATED"), null)
-          if (inserted) {
-            question = ""; options = ""; answer = ""; explanation = ""; status = "Question saved."
-          } else status = "This question already exists in the Question Bank."
+          if (inserted) { question = ""; options = ""; answer = ""; explanation = ""; status = "Question saved." }
+          else status = "This question already exists in the Question Bank."
         }
       }) { Text("Save Question") }
       TextButton(onClick = onDone) { Text("Back") }
