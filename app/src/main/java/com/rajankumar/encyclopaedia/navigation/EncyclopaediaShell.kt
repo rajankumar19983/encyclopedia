@@ -28,6 +28,7 @@ import com.rajankumar.encyclopaedia.feature.accessibility.AccessibilitySettingsS
 import com.rajankumar.encyclopaedia.feature.backup.BackupScreen
 import com.rajankumar.encyclopaedia.feature.common.FeaturePlaceholderScreen
 import com.rajankumar.encyclopaedia.feature.home.HomeScreen
+import com.rajankumar.encyclopaedia.feature.importer.QuestionImportScreen
 import com.rajankumar.encyclopaedia.feature.knowledge.KnowledgeScreen
 import com.rajankumar.encyclopaedia.feature.performance.PerformanceScreen
 import com.rajankumar.encyclopaedia.feature.planner.PlannerScreen
@@ -51,22 +52,20 @@ fun EncyclopaediaShell(navController: NavHostController, useNavigationRail: Bool
     if (useNavigationRail) {
       Row(Modifier.fillMaxSize()) {
         NavigationRail(header = { Text("Encyclopaedia", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(16.dp)) }) {
-          AppDestination.entries.forEach { destination ->
+          AppDestination.entries.filter(AppDestination::showInTabletSidebar).forEach { destination ->
             NavigationRailItem(selected = currentRoute == destination.route, onClick = { navigateSingleTop(navController, destination.route) }, icon = { Icon(destination.icon, destination.label) }, label = { Text(destination.label) })
           }
         }
         Box(Modifier.weight(1f)) { EncyclopaediaNavHost(navController) }
       }
     } else {
-      val compact = listOf(AppDestination.Home, AppDestination.Learn, AppDestination.Questions, AppDestination.Practice, AppDestination.Settings)
+      val compact = listOf(AppDestination.Home, AppDestination.Learn, AppDestination.Questions, AppDestination.Revision, AppDestination.Settings)
       Scaffold(bottomBar = { NavigationBar { compact.forEach { destination -> NavigationBarItem(selected = currentRoute == destination.route, onClick = { navigateSingleTop(navController, destination.route) }, icon = { Icon(destination.icon, destination.label) }, label = { Text(destination.label) }) } } }) { padding ->
         Box(Modifier.padding(padding)) { EncyclopaediaNavHost(navController) }
       }
     }
 
-    Box(Modifier.padding(20.dp)) {
-      TeacherLauncher(onClick = { teacherOpen = true })
-    }
+    Box(Modifier.padding(20.dp)) { TeacherLauncher(onClick = { teacherOpen = true }) }
   }
 
   if (teacherOpen) {
@@ -91,7 +90,15 @@ fun EncyclopaediaShell(navController: NavHostController, useNavigationRail: Bool
 @Composable
 private fun EncyclopaediaNavHost(navController: NavHostController) {
   NavHost(navController, startDestination = AppDestination.Home.route) {
-    composable(AppDestination.Home.route) { HomeScreen() }
+    composable(AppDestination.Home.route) {
+      HomeScreen(
+        onOpenPlanner = { navigateSingleTop(navController, AppDestination.Planner.route) },
+        onPractice = { navigateSingleTop(navController, AppDestination.Practice.route) },
+        onImport = { navigateSingleTop(navController, AppDestination.Import.route) },
+        onAddNotes = { navigateSingleTop(navController, AppDestination.Learn.route) },
+        onRevision = { navigateSingleTop(navController, AppDestination.Revision.route) }
+      )
+    }
     composable(AppDestination.Learn.route) { KnowledgeScreen() }
     composable(AppDestination.Questions.route) { QuestionBankScreen() }
     composable(AppDestination.Practice.route) { PracticeScreen(onDone = { navigateSingleTop(navController, AppDestination.Questions.route) }) }
@@ -99,6 +106,8 @@ private fun EncyclopaediaNavHost(navController: NavHostController) {
     composable(AppDestination.Planner.route) { PlannerScreen() }
     composable(AppDestination.Pyq.route) { FeaturePlaceholderScreen("PYQ Papers", "Organize official previous-year questions by exam, year, paper and shift.") }
     composable(AppDestination.Performance.route) { PerformanceScreen() }
+    composable(AppDestination.QuestionEditor.route) { FeaturePlaceholderScreen("Question Editor", "Create and edit questions manually.") }
+    composable(AppDestination.Import.route) { QuestionImportScreen(onDone = { navController.popBackStack() }) }
     composable(AppDestination.Backup.route) { BackupScreen() }
     composable(AppDestination.Settings.route) { AccessibilitySettingsScreen() }
   }
