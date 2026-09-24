@@ -9,4 +9,5 @@ class ManualQuestionDraftTest {
   @Test fun rejectsAnswerOutsideOptions() = assertFalse(ManualQuestionDraft("Q?", "One\nTwo", "C").isValid())
   @Test fun rejectsTooManyOptions() = assertFalse(ManualQuestionDraft("Q?", "1\n2\n3\n4\n5\n6\n7", "A").isValid())
   @Test fun trimsBlankOptionLines() = assertEquals(listOf("One", "Two"), ManualQuestionDraft("Q?", " One \n\n Two ", "A").options)
+  @Test fun explainsInvalidAnswer() = assertEquals("The correct answer must point to one of the listed options.", ManualQuestionDraft("Q?", "One\nTwo", "X").validationMessage())
 }
