@@ -10,8 +10,8 @@ import org.robolectric.RobolectricTestRunner
 class OpenAiResponseTextExtractorTest {
   @Test
   fun extractsOutputText() {
-    val raw = """{"output":[{"content":[{"type":"output_text","text":"{\\"title\\":\\"DBMS\\"}"}]}]}"""
-    assertEquals("{\\"title\\":\\"DBMS\\"}", OpenAiResponseTextExtractor.extract(raw))
+    val raw = """{"output":[{"content":[{"type":"output_text","text":"{\"title\":\"DBMS\"}"}]}]}"""
+    assertEquals("{\"title\":\"DBMS\"}", OpenAiResponseTextExtractor.extract(raw))
   }
 
   @Test
