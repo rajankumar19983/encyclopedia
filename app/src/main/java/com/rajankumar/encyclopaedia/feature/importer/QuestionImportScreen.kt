@@ -19,130 +19,62 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.rajankumar.encyclopaedia.data.local.EncyclopaediaDatabase
-import com.rajankumar.encyclopaedia.data.local.QuestionEntity
-import java.util.UUID
-import kotlinx.coroutines.launch
-
-internal data class ReviewDraft(
-  val parsed: ParsedQuestionDraft,
-  val source: String,
-  val metadata: OcrSourceMetadata,
-  val review: OcrDraftReviewState = OcrDraftReviewState(),
-  val edit: OcrDraftEditState = parsed.toEditState(),
-)
-
-internal fun List<ReviewDraft>.updateDraft(
-  index: Int,
-  transform: (ReviewDraft) -> ReviewDraft,
-): List<ReviewDraft> = mapIndexed { draftIndex, draft ->
-  if (draftIndex == index) transform(draft) else draft
-}
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
 fun QuestionImportScreen(onDone: () -> Unit) {
-  val context = LocalContext.current
-  val dao = EncyclopaediaDatabase.get(context).dao()
-  val scope = rememberCoroutineScope()
-  val documentImporter = remember(context.contentResolver) { OcrDocumentImporter(context.contentResolver) }
+  val viewModel: ImportReviewViewModel = viewModel()
+  val state = viewModel.uiState
   val checklistItems = remember { ocrReviewChecklist() }
-  var drafts by remember { mutableStateOf<List<ReviewDraft>>(emptyList()) }
-  var rawText by remember { mutableStateOf("") }
-  var preparation by remember { mutableStateOf<OcrImportPreparation?>(null) }
-  var extractionNotices by remember { mutableStateOf<List<String>>(emptyList()) }
-  var status by remember { mutableStateOf("Choose one or more images, or a PDF containing printed MCQs.") }
-  var busy by remember { mutableStateOf(false) }
-  var filter by remember { mutableStateOf(OcrReviewFilter.ALL) }
-
-  fun review(document: OcrDocumentImport, source: String) {
-    val text = document.extraction.combinedText
-    rawText = text
-    extractionNotices = document.allNotices()
-    val prepared = prepareOcrImport(text)
-    preparation = prepared
-    drafts = prepared.drafts.map { ReviewDraft(it, source, prepared.metadata) }
-    status = when {
-      document.extraction.failedPages.isNotEmpty() -> "OCR completed with ${document.extraction.failedPages.size} source failure(s). Review warnings below."
-      prepared.drafts.isEmpty() -> "OCR completed, but no reviewable MCQs were parsed."
-      else -> prepared.report().message()
-    }
-  }
 
   val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
-    if (uris.isNotEmpty()) {
-      busy = true
-      status = "Reading ${uris.size} image${if (uris.size == 1) "" else "s"}…"
-      scope.launch {
-        runCatching {
-          documentImporter.importImages(uris) { progress ->
-            status = "Reading image ${progress.completed} of ${progress.total}…"
-          }
-        }.onSuccess { review(it, "SCAN") }
-          .onFailure { status = "Image OCR failed: ${it.message ?: "unknown error"}" }
-        busy = false
-      }
-    }
+    viewModel.importImages(uris)
   }
   val pdfPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-    if (uri != null) {
-      busy = true
-      status = "Reading PDF pages…"
-      scope.launch {
-        runCatching { documentImporter.importPdf(uri) }
-          .onSuccess { review(it, "PDF") }
-          .onFailure { status = "PDF OCR failed: ${it.message ?: "unknown error"}" }
-        busy = false
-      }
-    }
+    if (uri != null) viewModel.importPdf(uri)
   }
 
-  val decisions = drafts.map { it.review.decision }
+  val decisions = state.drafts.map { it.review.decision }
   val summary = buildOcrReviewUiSummary(decisions)
   Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
     Text("Import Questions", style = MaterialTheme.typography.headlineMedium)
     Text("Printed English text only. Select multiple images when a question set spans several scans. Source images are not stored and OCR drafts are never saved automatically.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-      Button(onClick = { imagePicker.launch("image/*") }, enabled = !busy) { Text("Choose Images") }
-      Button(onClick = { pdfPicker.launch("application/pdf") }, enabled = !busy) { Text("Choose PDF") }
+      Button(onClick = { imagePicker.launch("image/*") }, enabled = !state.busy) { Text("Choose Images") }
+      Button(onClick = { pdfPicker.launch("application/pdf") }, enabled = !state.busy) { Text("Choose PDF") }
       TextButton(onClick = onDone) { Text("Back") }
     }
-    Text(status)
-    extractionNotices.forEach { Text("⚠ $it", color = MaterialTheme.colorScheme.error) }
-    preparation?.let { prepared ->
+    Text(state.status)
+    state.extractionNotices.forEach { Text("⚠ $it", color = MaterialTheme.colorScheme.error) }
+    state.preparation?.let { prepared ->
       prepared.sanitized.summary().message()?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
       prepared.diagnostics.message()?.let { Text("⚠ $it", color = MaterialTheme.colorScheme.error) }
       prepared.sanitized.removedLinePreviews().forEach { removed -> Text("Excluded: ${removed.text} — ${removed.reason}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
-    if (drafts.isNotEmpty()) {
+    if (state.drafts.isNotEmpty()) {
       Text(summary.headline, style = MaterialTheme.typography.titleMedium)
       Text(summary.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
       Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         OcrReviewFilter.entries.forEach { choice ->
-          FilterChip(selected = filter == choice, onClick = { filter = choice }, label = { Text("${choice.name.lowercase().replaceFirstChar { it.uppercase() }} (${choice.count(decisions)})") })
+          FilterChip(selected = state.filter == choice, onClick = { viewModel.setFilter(choice) }, label = { Text("${choice.name.lowercase().replaceFirstChar { it.uppercase() }} (${choice.count(decisions)})") })
         }
       }
     }
-    if (drafts.isEmpty() && rawText.isNotBlank()) Card(Modifier.fillMaxWidth()) {
+    if (state.drafts.isEmpty() && state.rawText.isNotBlank()) Card(Modifier.fillMaxWidth()) {
       Column(Modifier.padding(16.dp)) {
         Text("OCR text for diagnosis", style = MaterialTheme.typography.titleMedium)
-        Text(preparation?.sanitized?.text?.take(2500).orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(state.preparation?.sanitized?.text?.take(2500).orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant)
       }
     }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-      itemsIndexed(drafts, key = { index, _ -> index }) { index, initial ->
-        if (!filter.matches(initial.review.decision)) return@itemsIndexed
+      itemsIndexed(state.drafts, key = { index, _ -> index }) { index, initial ->
+        if (!state.filter.matches(initial.review.decision)) return@itemsIndexed
         val edit = initial.edit
         val validation = edit.validation()
         val gate = evaluateOcrApproval(validation, initial.review.checklist, checklistItems)
-        val options = edit.editable().cleanedOptions
         Card(Modifier.fillMaxWidth()) {
           Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Draft ${index + 1} • ${importSourceLabel(initial.source, initial.metadata)}", style = MaterialTheme.typography.titleMedium)
@@ -150,14 +82,14 @@ fun QuestionImportScreen(onDone: () -> Unit) {
             Text(sourceMetadataSummary(initial.metadata), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             validation.issues.forEach { Text("⚠ $it", color = MaterialTheme.colorScheme.error) }
             OutlinedTextField(edit.question, { value ->
-              drafts = drafts.updateDraft(index) { it.copy(edit = it.edit.copy(question = value)) }
+              viewModel.updateQuestion(index, value)
             }, label = { Text("Question") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(edit.optionsText, { value ->
-              drafts = drafts.updateDraft(index) { it.copy(edit = it.edit.copy(optionsText = value)) }
+              viewModel.updateOptions(index, value)
             }, label = { Text("Options — one per line (2 or more)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
             edit.editable().optionPreview().forEach { option -> Text("${option.label}. ${option.text}", style = MaterialTheme.typography.bodySmall) }
             OutlinedTextField(edit.answer, { value ->
-              drafts = drafts.updateDraft(index) { it.copy(edit = it.edit.copy(answer = value.take(2).uppercase())) }
+              viewModel.updateAnswer(index, value)
             }, label = { Text("Correct option (A, B… or 1, 2…)") })
             Text("Manual verification", style = MaterialTheme.typography.titleSmall)
             checklistItems.forEachIndexed { checkIndex, item ->
@@ -166,7 +98,7 @@ fun QuestionImportScreen(onDone: () -> Unit) {
                   checked = checkIndex in initial.review.checklist.checked,
                   enabled = initial.review.decision == OcrReviewDecision.PENDING,
                   onCheckedChange = {
-                    drafts = drafts.updateDraft(index) { it.copy(review = it.review.copy(checklist = it.review.checklist.toggle(checkIndex))) }
+                    viewModel.toggleChecklistItem(index, checkIndex)
                   },
                 )
                 Text(item.label + if (item.required) " *" else "", modifier = Modifier.padding(top = 12.dp))
@@ -177,26 +109,10 @@ fun QuestionImportScreen(onDone: () -> Unit) {
             gate.reasons.forEach { Text("⚠ $it", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
               Button(enabled = gate.allowed && initial.review.saveStatus != OcrDraftSaveStatus.SAVING && initial.review.decision == OcrReviewDecision.PENDING, onClick = {
-                drafts = drafts.updateDraft(index) { it.copy(review = it.review.copy(saveStatus = OcrDraftSaveStatus.SAVING)) }
-                scope.launch {
-                  runCatching {
-                    dao.saveImportedQuestionIfUnique(QuestionEntity(
-                      id = UUID.randomUUID().toString(), questionText = edit.question.trim(), options = options.joinToString("\n"),
-                      correctAnswer = validation.normalizedAnswer.orEmpty(), explanation = initial.parsed.explanation,
-                      source = initial.source, difficulty = "UNRATED"
-                    ), null)
-                  }.onSuccess { inserted ->
-                    drafts = drafts.updateDraft(index) { draft -> draft.copy(review = draft.review.copy(
-                      decision = if (inserted) OcrReviewDecision.APPROVED else draft.review.decision,
-                      saveStatus = if (inserted) OcrDraftSaveStatus.SAVED else OcrDraftSaveStatus.DUPLICATE,
-                    )) }
-                  }.onFailure {
-                    drafts = drafts.updateDraft(index) { it.copy(review = it.review.copy(saveStatus = OcrDraftSaveStatus.FAILED)) }
-                  }
-                }
+                viewModel.save(index)
               }) { Text(initial.review.saveStatus.label()) }
               TextButton(enabled = initial.review.decision == OcrReviewDecision.PENDING, onClick = {
-                drafts = drafts.updateDraft(index) { it.copy(review = it.review.copy(decision = OcrReviewDecision.REJECTED)) }
+                viewModel.reject(index)
               }) { Text(if (initial.review.decision == OcrReviewDecision.REJECTED) "Rejected" else "Reject") }
             }
             when {
