@@ -1,6 +1,5 @@
 package com.rajankumar.encyclopaedia.feature.importer
 
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -10,8 +9,8 @@ class EditableImportOptionLimitTest {
     assertTrue(draft.validateForSave().canSave)
   }
 
-  @Test fun sevenOptionsCannotSave() {
+  @Test fun sevenOptionsRemainSupportedByEditableImport() {
     val draft = EditableImportDraft("Choose the correct protocol from these options", List(7) { "Option ${it + 1}" }, "A")
-    assertFalse(draft.validateForSave().canSave)
+    assertTrue(draft.validateForSave().canSave)
   }
 }
