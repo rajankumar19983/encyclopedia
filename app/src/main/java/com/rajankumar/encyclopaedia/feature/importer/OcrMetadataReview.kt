@@ -15,8 +15,15 @@ fun OcrSourceMetadata.reviewGuidance(): OcrMetadataReview = when (confidence) {
     OcrMetadataConfidence.LOW,
     "Only limited source metadata was detected. Complete and verify it during review."
   )
-  OcrMetadataConfidence.NONE -> OcrMetadataReview(
-    OcrMetadataConfidence.NONE,
-    "No source metadata was detected. Add it manually when known."
-  )
+  OcrMetadataConfidence.NONE -> {
+    val hasMetadata = examName != null || year != null || examDate != null || shift != null
+    OcrMetadataReview(
+      OcrMetadataConfidence.NONE,
+      if (hasMetadata) {
+        "Source metadata is present without a confidence rating. Verify it before saving."
+      } else {
+        "No source metadata was detected. Add it manually when known."
+      }
+    )
+  }
 }
