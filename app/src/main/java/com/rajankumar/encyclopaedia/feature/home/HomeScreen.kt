@@ -1,29 +1,14 @@
 package com.rajankumar.encyclopaedia.feature.home
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoStories
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Quiz
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -46,18 +31,46 @@ fun HomeScreen() {
   val practisedCount by dao.observePractisedQuestionCount().collectAsStateWithLifecycle(0)
   val snapshot = HomeDashboardSnapshot(topicCount, questionCount, attemptCount, correctCount, practisedCount).normalized()
   val dashboard = snapshot.dashboard()
-  val emptyState = homeEmptyState(snapshot.topicCount, snapshot.questionCount)
 
-  Column(Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+  Row(Modifier.fillMaxSize().padding(24.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+      HomeHeader()
+      LazyVerticalGrid(
+        columns = GridCells.Fixed(4),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = Modifier.heightIn(max = 150.dp)
+      ) {
+        items(dashboard.stats.zip(statIcons)) { (stat, icon) -> StatCard(stat, icon) }
+      }
+      TodayPlanCard(dashboard.recommendation)
+      QuickActionsCard()
+    }
+    Column(Modifier.width(280.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+      CalendarCard()
+      UpcomingCard()
+      MotivationCard(dashboard.motivation)
+    }
+  }
+}
+
+@Composable
+private fun HomeHeader() {
+  var query by remember { mutableStateOf("") }
+  Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+    Column(Modifier.weight(1f)) {
       Text(homeGreeting(), style = MaterialTheme.typography.headlineMedium)
-      Text(dashboard.motivation, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+      Text("Let's continue your preparation journey.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    LazyVerticalGrid(columns = GridCells.Adaptive(210.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxSize()) {
-      items(dashboard.stats.zip(statIcons)) { (stat, icon) -> StatCard(stat, icon) }
-      if (emptyState.visible) item(span = { GridItemSpan(maxLineSpan) }) { EmptyStateCard(emptyState) }
-      item(span = { GridItemSpan(maxLineSpan) }) { TodayPlanCard(dashboard.recommendation) }
-    }
+    OutlinedTextField(
+      value = query,
+      onValueChange = { query = it },
+      leadingIcon = { Icon(Icons.Default.Search, null) },
+      placeholder = { Text("Search topics, questions, notes...") },
+      singleLine = true,
+      shape = RoundedCornerShape(14.dp),
+      modifier = Modifier.width(330.dp)
+    )
   }
 }
 
@@ -65,15 +78,13 @@ fun HomeScreen() {
 private fun StatCard(stat: HomeStatModel, icon: ImageVector) {
   Card(
     Modifier.fillMaxWidth().semantics { contentDescription = stat.accessibilityDescription() },
+    shape = RoundedCornerShape(16.dp),
     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
   ) {
-    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-      Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
-        Text(stat.title, style = MaterialTheme.typography.titleMedium)
-      }
-      Text(stat.value, style = MaterialTheme.typography.headlineLarge)
-      Text(stat.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+      Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
+      Text(stat.title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+      Text(stat.value, style = MaterialTheme.typography.headlineMedium)
       LinearProgressIndicator(progress = { stat.progress }, modifier = Modifier.fillMaxWidth())
     }
   }
@@ -81,27 +92,75 @@ private fun StatCard(stat: HomeStatModel, icon: ImageVector) {
 
 @Composable
 private fun TodayPlanCard(recommendation: HomePlanRecommendation) {
-  Card(
-    Modifier.fillMaxWidth().semantics { contentDescription = recommendation.accessibilityDescription() },
-    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-  ) {
-    Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-      Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Default.Bolt, null, tint = MaterialTheme.colorScheme.primary)
-        Text("Today's Focus", style = MaterialTheme.typography.titleLarge)
+  Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+      Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text("Today's Plan", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+        TextButton(onClick = {}) { Text("View Daily Routine") }
       }
       Text(recommendation.title, style = MaterialTheme.typography.titleMedium)
-      Text(recommendation.detail)
+      Text(recommendation.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
+      LinearProgressIndicator(progress = { 0f }, modifier = Modifier.fillMaxWidth())
+      Text("Your scheduled study tasks will appear here.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
   }
 }
 
 @Composable
-private fun EmptyStateCard(state: HomeEmptyState) {
-  Card(Modifier.fillMaxWidth()) {
-    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-      Text(state.title, style = MaterialTheme.typography.titleMedium)
-      Text(state.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun QuickActionsCard() {
+  Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+      Text("Quick Actions", style = MaterialTheme.typography.titleLarge)
+      Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        QuickAction(Icons.Default.Quiz, "Practice MCQs", Modifier.weight(1f))
+        QuickAction(Icons.Default.UploadFile, "Import PYQs", Modifier.weight(1f))
+        QuickAction(Icons.Default.EditNote, "Add Notes", Modifier.weight(1f))
+        QuickAction(Icons.Default.Refresh, "Start Revision", Modifier.weight(1f))
+      }
+    }
+  }
+}
+
+@Composable
+private fun QuickAction(icon: ImageVector, label: String, modifier: Modifier = Modifier) {
+  OutlinedCard(modifier, shape = RoundedCornerShape(14.dp)) {
+    Column(Modifier.fillMaxWidth().padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+      Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
+      Text(label, style = MaterialTheme.typography.labelLarge)
+    }
+  }
+}
+
+@Composable
+private fun CalendarCard() {
+  Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+      Text("Calendar", style = MaterialTheme.typography.titleMedium)
+      Text("Plan and review your study days from Daily Routine.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+      OutlinedButton(onClick = {}, modifier = Modifier.fillMaxWidth()) { Text("Open Daily Routine") }
+    }
+  }
+}
+
+@Composable
+private fun UpcomingCard() {
+  Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+      Text("Upcoming", style = MaterialTheme.typography.titleMedium)
+      Text("No upcoming study tasks yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+  }
+}
+
+@Composable
+private fun MotivationCard(message: String) {
+  Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), shape = RoundedCornerShape(16.dp)) {
+    Row(Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+      Icon(Icons.Default.LocalFireDepartment, null, tint = MaterialTheme.colorScheme.primary)
+      Column {
+        Text("Keep the streak alive!", style = MaterialTheme.typography.titleSmall)
+        Text(message, style = MaterialTheme.typography.bodySmall)
+      }
     }
   }
 }
