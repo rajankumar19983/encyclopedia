@@ -12,7 +12,7 @@ fun EditableImportDraft.validateForSave(): EditableImportValidation {
   val answer = normalizedImportedAnswer(answer, options.size)
   val issues = buildList {
     if (question.isBlank()) add("Question text is required.")
-    if (options.size !in 4..6) add("Imported MCQs must contain between four and six options.")
+    if (options.size < 2) add("At least two options are required.")
     if (!hasOnlyEnglishOcrContent()) add("Hindi/Devanagari OCR text must be removed before saving.")
     if (answer == null) add("Choose a correct option that exists in this question.")
 
