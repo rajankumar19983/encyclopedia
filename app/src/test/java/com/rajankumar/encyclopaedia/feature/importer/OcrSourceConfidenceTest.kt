@@ -4,10 +4,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class OcrSourceConfidenceTest {
-  @Test fun classifiesMetadataCompleteness() {
-    assertEquals(OcrMetadataConfidence.NONE, OcrSourceMetadata().confidence())
-    assertEquals(OcrMetadataConfidence.PARTIAL, OcrSourceMetadata(examName = "DSSSB").confidence())
-    assertEquals(OcrMetadataConfidence.PARTIAL, OcrSourceMetadata(year = 2024).confidence())
-    assertEquals(OcrMetadataConfidence.COMPLETE, OcrSourceMetadata("DSSSB", 2024).confidence())
+  @Test fun classifiesMetadataConfidence() {
+    assertEquals(OcrMetadataConfidence.NONE, OcrSourceMetadataExtractor.extract("No source metadata").confidence)
+    assertEquals(OcrMetadataConfidence.LOW, OcrSourceMetadataExtractor.extract("DSSSB").confidence)
+    assertEquals(OcrMetadataConfidence.MEDIUM, OcrSourceMetadataExtractor.extract("DSSSB 2024").confidence)
+    assertEquals(OcrMetadataConfidence.HIGH, OcrSourceMetadataExtractor.extract("DSSSB 2024 SHIFT 1").confidence)
   }
 }
