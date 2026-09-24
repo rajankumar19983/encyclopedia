@@ -9,4 +9,5 @@ class HomeSearchQueryTest {
   @Test fun singleCharacterQueryIsInactive() = assertFalse(HomeSearchQuery("a").active)
   @Test fun twoCharacterQueryIsActive() = assertTrue(HomeSearchQuery("os").active)
   @Test fun queryIsBounded() = assertEquals(120, HomeSearchQuery("a".repeat(200)).normalized.length)
+  @Test fun typedQueryCanBeCleared() = assertTrue(HomeSearchQuery("os").canClear)
 }
