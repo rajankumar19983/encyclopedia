@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.ui.graphics.vector.ImageVector
 
 enum class AppDestination(
@@ -20,14 +21,19 @@ enum class AppDestination(
   val icon: ImageVector
 ) {
   Home("home", "Home", Icons.Default.Home),
-  Learn("learn", "Knowledge & Lessons", Icons.Default.AutoStories),
-  Questions("questions", "Question Bank", Icons.Default.Quiz),
-  Practice("practice", "Practice", Icons.Default.Psychology),
+  Learn("learn", "Topics & Knowledge", Icons.Default.AutoStories),
+  Questions("questions", "Questions", Icons.Default.Quiz),
   Revision("revision", "Revision", Icons.Default.Sync),
-  Planner("planner", "Daily Planner", Icons.Default.CalendarMonth),
-  Notebook("notebook", "Notebook", Icons.Default.EditNote),
+  Planner("planner", "Daily Routine", Icons.Default.CalendarMonth),
   Pyq("pyq", "PYQ Papers", Icons.Default.Description),
   Performance("performance", "Performance", Icons.Default.Analytics),
+  QuestionEditor("question-editor", "Question Editor", Icons.Default.EditNote),
+  Import("import", "Import / OCR", Icons.Default.UploadFile),
   Backup("backup", "Backup & Restore", Icons.Default.Backup),
-  Settings("settings", "Settings", Icons.Default.Settings)
+  Settings("settings", "Settings", Icons.Default.Settings),
+  Practice("practice", "Practice", Icons.Default.Psychology),
+  Notebook("notebook", "Notebook", Icons.Default.EditNote)
 }
+
+val AppDestination.showInTabletSidebar: Boolean
+  get() = this != AppDestination.Practice && this != AppDestination.Notebook
