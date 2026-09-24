@@ -22,7 +22,13 @@ import com.rajankumar.encyclopaedia.data.local.EncyclopaediaDatabase
 private val statIcons = listOf(Icons.Default.AutoStories, Icons.Default.Quiz, Icons.Default.LocalFireDepartment, Icons.Default.CheckCircle)
 
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+  onOpenPlanner: () -> Unit = {},
+  onPractice: () -> Unit = {},
+  onImport: () -> Unit = {},
+  onAddNotes: () -> Unit = {},
+  onRevision: () -> Unit = {}
+) {
   val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
   val topicCount by dao.observeTopicCount().collectAsStateWithLifecycle(0)
   val questionCount by dao.observeQuestionCount().collectAsStateWithLifecycle(0)
@@ -40,15 +46,13 @@ fun HomeScreen() {
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
         modifier = Modifier.heightIn(max = 150.dp)
-      ) {
-        items(dashboard.stats.zip(statIcons)) { (stat, icon) -> StatCard(stat, icon) }
-      }
-      TodayPlanCard(dashboard.recommendation)
-      QuickActionsCard()
+      ) { items(dashboard.stats.zip(statIcons)) { (stat, icon) -> StatCard(stat, icon) } }
+      TodayPlanCard(dashboard.recommendation, onOpenPlanner)
+      QuickActionsCard(onPractice, onImport, onAddNotes, onRevision)
     }
     Column(Modifier.width(280.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-      CalendarCard()
-      UpcomingCard()
+      CalendarCard(onOpenPlanner)
+      UpcomingCard(onOpenPlanner)
       MotivationCard(dashboard.motivation)
     }
   }
@@ -62,25 +66,13 @@ private fun HomeHeader() {
       Text(homeGreeting(), style = MaterialTheme.typography.headlineMedium)
       Text("Let's continue your preparation journey.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    OutlinedTextField(
-      value = query,
-      onValueChange = { query = it },
-      leadingIcon = { Icon(Icons.Default.Search, null) },
-      placeholder = { Text("Search topics, questions, notes...") },
-      singleLine = true,
-      shape = RoundedCornerShape(14.dp),
-      modifier = Modifier.width(330.dp)
-    )
+    OutlinedTextField(value = query, onValueChange = { query = it }, leadingIcon = { Icon(Icons.Default.Search, null) }, placeholder = { Text("Search topics, questions, notes...") }, singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.width(330.dp))
   }
 }
 
 @Composable
 private fun StatCard(stat: HomeStatModel, icon: ImageVector) {
-  Card(
-    Modifier.fillMaxWidth().semantics { contentDescription = stat.accessibilityDescription() },
-    shape = RoundedCornerShape(16.dp),
-    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-  ) {
+  Card(Modifier.fillMaxWidth().semantics { contentDescription = stat.accessibilityDescription() }, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
       Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
       Text(stat.title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -91,12 +83,12 @@ private fun StatCard(stat: HomeStatModel, icon: ImageVector) {
 }
 
 @Composable
-private fun TodayPlanCard(recommendation: HomePlanRecommendation) {
+private fun TodayPlanCard(recommendation: HomePlanRecommendation, onOpenPlanner: () -> Unit) {
   Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
       Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text("Today's Plan", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-        TextButton(onClick = {}) { Text("View Daily Routine") }
+        TextButton(onClick = onOpenPlanner) { Text("View Daily Routine") }
       }
       Text(recommendation.title, style = MaterialTheme.typography.titleMedium)
       Text(recommendation.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -107,23 +99,23 @@ private fun TodayPlanCard(recommendation: HomePlanRecommendation) {
 }
 
 @Composable
-private fun QuickActionsCard() {
+private fun QuickActionsCard(onPractice: () -> Unit, onImport: () -> Unit, onAddNotes: () -> Unit, onRevision: () -> Unit) {
   Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
       Text("Quick Actions", style = MaterialTheme.typography.titleLarge)
       Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        QuickAction(Icons.Default.Quiz, "Practice MCQs", Modifier.weight(1f))
-        QuickAction(Icons.Default.UploadFile, "Import PYQs", Modifier.weight(1f))
-        QuickAction(Icons.Default.EditNote, "Add Notes", Modifier.weight(1f))
-        QuickAction(Icons.Default.Refresh, "Start Revision", Modifier.weight(1f))
+        QuickAction(Icons.Default.Quiz, "Practice MCQs", onPractice, Modifier.weight(1f))
+        QuickAction(Icons.Default.UploadFile, "Import PYQs", onImport, Modifier.weight(1f))
+        QuickAction(Icons.Default.EditNote, "Add Notes", onAddNotes, Modifier.weight(1f))
+        QuickAction(Icons.Default.Refresh, "Start Revision", onRevision, Modifier.weight(1f))
       }
     }
   }
 }
 
 @Composable
-private fun QuickAction(icon: ImageVector, label: String, modifier: Modifier = Modifier) {
-  OutlinedCard(modifier, shape = RoundedCornerShape(14.dp)) {
+private fun QuickAction(icon: ImageVector, label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+  OutlinedCard(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(14.dp)) {
     Column(Modifier.fillMaxWidth().padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
       Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
       Text(label, style = MaterialTheme.typography.labelLarge)
@@ -132,21 +124,24 @@ private fun QuickAction(icon: ImageVector, label: String, modifier: Modifier = M
 }
 
 @Composable
-private fun CalendarCard() {
+private fun CalendarCard(onOpenPlanner: () -> Unit) {
   Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
       Text("Calendar", style = MaterialTheme.typography.titleMedium)
       Text("Plan and review your study days from Daily Routine.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-      OutlinedButton(onClick = {}, modifier = Modifier.fillMaxWidth()) { Text("Open Daily Routine") }
+      OutlinedButton(onClick = onOpenPlanner, modifier = Modifier.fillMaxWidth()) { Text("Open Daily Routine") }
     }
   }
 }
 
 @Composable
-private fun UpcomingCard() {
+private fun UpcomingCard(onOpenPlanner: () -> Unit) {
   Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-      Text("Upcoming", style = MaterialTheme.typography.titleMedium)
+      Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text("Upcoming", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        TextButton(onClick = onOpenPlanner) { Text("View") }
+      }
       Text("No upcoming study tasks yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
   }
@@ -157,10 +152,7 @@ private fun MotivationCard(message: String) {
   Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), shape = RoundedCornerShape(16.dp)) {
     Row(Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
       Icon(Icons.Default.LocalFireDepartment, null, tint = MaterialTheme.colorScheme.primary)
-      Column {
-        Text("Keep the streak alive!", style = MaterialTheme.typography.titleSmall)
-        Text(message, style = MaterialTheme.typography.bodySmall)
-      }
+      Column { Text("Keep the streak alive!", style = MaterialTheme.typography.titleSmall); Text(message, style = MaterialTheme.typography.bodySmall) }
     }
   }
 }
