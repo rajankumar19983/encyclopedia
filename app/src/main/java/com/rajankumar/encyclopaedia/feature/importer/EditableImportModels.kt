@@ -1,5 +1,24 @@
 package com.rajankumar.encyclopaedia.feature.importer
 
+data class EditableImportDraft(
+  val question: String,
+  val options: List<String>,
+  val answer: String
+) {
+  val cleanedOptions: List<String> get() = options.map(String::trim).filter(String::isNotBlank)
+
+  fun isValid(): Boolean = validateForSave().canSave
+}
+fun EditableImportDraft.englishOnly(): EditableImportDraft = copy(
+  question = OcrEnglishTextFilter.filter(question),
+  options = options.map(OcrEnglishTextFilter::filter),
+  answer = answer.trim()
+)
+
+fun EditableImportDraft.hasOnlyEnglishOcrContent(): Boolean =
+  !OcrEnglishTextFilter.containsDevanagari(question) &&
+    options.none(OcrEnglishTextFilter::containsDevanagari)
+
 data class EditableImportValidation(
   val normalizedAnswer: String?,
   val issues: List<String>,
