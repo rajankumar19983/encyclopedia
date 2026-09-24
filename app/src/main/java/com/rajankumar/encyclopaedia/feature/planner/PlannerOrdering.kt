@@ -6,4 +6,5 @@ fun List<PlannerTaskEntity>.orderedForPlanner(): List<PlannerTaskEntity> = sorte
   compareBy<PlannerTaskEntity> { it.isCompleted }
     .thenBy { it.carriedFromDate == null }
     .thenBy { it.createdAt }
+    .thenBy { it.id }
 )
