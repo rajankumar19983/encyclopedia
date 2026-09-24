@@ -32,12 +32,20 @@ import com.rajankumar.encyclopaedia.data.local.QuestionEntity
 import java.util.UUID
 import kotlinx.coroutines.launch
 
-private data class ReviewDraft(
+internal data class ReviewDraft(
   val parsed: ParsedQuestionDraft,
   val source: String,
   val metadata: OcrSourceMetadata,
   val review: OcrDraftReviewState = OcrDraftReviewState(),
+  val edit: OcrDraftEditState = parsed.toEditState(),
 )
+
+internal fun List<ReviewDraft>.updateDraft(
+  index: Int,
+  transform: (ReviewDraft) -> ReviewDraft,
+): List<ReviewDraft> = mapIndexed { draftIndex, draft ->
+  if (draftIndex == index) transform(draft) else draft
+}
 
 @Composable
 fun QuestionImportScreen(onDone: () -> Unit) {
@@ -129,9 +137,9 @@ fun QuestionImportScreen(onDone: () -> Unit) {
       }
     }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-      itemsIndexed(drafts) { index, initial ->
+      itemsIndexed(drafts, key = { index, _ -> index }) { index, initial ->
         if (!filter.matches(initial.review.decision)) return@itemsIndexed
-        var edit by remember(initial.parsed) { mutableStateOf(initial.parsed.toEditState()) }
+        val edit = initial.edit
         val validation = edit.validation()
         val gate = evaluateOcrApproval(validation, initial.review.checklist, checklistItems)
         val options = edit.editable().cleanedOptions
@@ -141,10 +149,16 @@ fun QuestionImportScreen(onDone: () -> Unit) {
             Text(initial.review.decision.accessibilityLabel(index + 1), style = MaterialTheme.typography.bodySmall)
             Text(sourceMetadataSummary(initial.metadata), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             validation.issues.forEach { Text("⚠ $it", color = MaterialTheme.colorScheme.error) }
-            OutlinedTextField(edit.question, { edit = edit.copy(question = it) }, label = { Text("Question") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(edit.optionsText, { edit = edit.copy(optionsText = it) }, label = { Text("Options — one per line (2 or more)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+            OutlinedTextField(edit.question, { value ->
+              drafts = drafts.updateDraft(index) { it.copy(edit = it.edit.copy(question = value)) }
+            }, label = { Text("Question") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(edit.optionsText, { value ->
+              drafts = drafts.updateDraft(index) { it.copy(edit = it.edit.copy(optionsText = value)) }
+            }, label = { Text("Options — one per line (2 or more)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
             edit.editable().optionPreview().forEach { option -> Text("${option.label}. ${option.text}", style = MaterialTheme.typography.bodySmall) }
-            OutlinedTextField(edit.answer, { edit = edit.copy(answer = it.take(2).uppercase()) }, label = { Text("Correct option (A, B… or 1, 2…)") })
+            OutlinedTextField(edit.answer, { value ->
+              drafts = drafts.updateDraft(index) { it.copy(edit = it.edit.copy(answer = value.take(2).uppercase())) }
+            }, label = { Text("Correct option (A, B… or 1, 2…)") })
             Text("Manual verification", style = MaterialTheme.typography.titleSmall)
             checklistItems.forEachIndexed { checkIndex, item ->
               Row {
@@ -152,7 +166,7 @@ fun QuestionImportScreen(onDone: () -> Unit) {
                   checked = checkIndex in initial.review.checklist.checked,
                   enabled = initial.review.decision == OcrReviewDecision.PENDING,
                   onCheckedChange = {
-                    drafts = drafts.mapIndexed { i, draft -> if (i == index) draft.copy(review = draft.review.copy(checklist = draft.review.checklist.toggle(checkIndex))) else draft }
+                    drafts = drafts.updateDraft(index) { it.copy(review = it.review.copy(checklist = it.review.checklist.toggle(checkIndex))) }
                   },
                 )
                 Text(item.label + if (item.required) " *" else "", modifier = Modifier.padding(top = 12.dp))
@@ -163,7 +177,7 @@ fun QuestionImportScreen(onDone: () -> Unit) {
             gate.reasons.forEach { Text("⚠ $it", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
               Button(enabled = gate.allowed && initial.review.saveStatus != OcrDraftSaveStatus.SAVING && initial.review.decision == OcrReviewDecision.PENDING, onClick = {
-                drafts = drafts.mapIndexed { i, draft -> if (i == index) draft.copy(review = draft.review.copy(saveStatus = OcrDraftSaveStatus.SAVING)) else draft }
+                drafts = drafts.updateDraft(index) { it.copy(review = it.review.copy(saveStatus = OcrDraftSaveStatus.SAVING)) }
                 scope.launch {
                   runCatching {
                     dao.saveImportedQuestionIfUnique(QuestionEntity(
@@ -172,17 +186,17 @@ fun QuestionImportScreen(onDone: () -> Unit) {
                       source = initial.source, difficulty = "UNRATED"
                     ), null)
                   }.onSuccess { inserted ->
-                    drafts = drafts.mapIndexed { i, draft -> if (i == index) draft.copy(review = draft.review.copy(
+                    drafts = drafts.updateDraft(index) { draft -> draft.copy(review = draft.review.copy(
                       decision = if (inserted) OcrReviewDecision.APPROVED else draft.review.decision,
                       saveStatus = if (inserted) OcrDraftSaveStatus.SAVED else OcrDraftSaveStatus.DUPLICATE,
-                    )) else draft }
+                    )) }
                   }.onFailure {
-                    drafts = drafts.mapIndexed { i, draft -> if (i == index) draft.copy(review = draft.review.copy(saveStatus = OcrDraftSaveStatus.FAILED)) else draft }
+                    drafts = drafts.updateDraft(index) { it.copy(review = it.review.copy(saveStatus = OcrDraftSaveStatus.FAILED)) }
                   }
                 }
               }) { Text(initial.review.saveStatus.label()) }
               TextButton(enabled = initial.review.decision == OcrReviewDecision.PENDING, onClick = {
-                drafts = drafts.mapIndexed { i, draft -> if (i == index) draft.copy(review = draft.review.copy(decision = OcrReviewDecision.REJECTED)) else draft }
+                drafts = drafts.updateDraft(index) { it.copy(review = it.review.copy(decision = OcrReviewDecision.REJECTED)) }
               }) { Text(if (initial.review.decision == OcrReviewDecision.REJECTED) "Rejected" else "Reject") }
             }
             when {
