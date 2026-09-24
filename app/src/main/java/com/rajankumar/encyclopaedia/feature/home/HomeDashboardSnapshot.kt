@@ -7,6 +7,8 @@ data class HomeDashboardSnapshot(
   val correctCount: Int,
   val practisedCount: Int
 ) {
+  val hasStudyData: Boolean get() = topicCount > 0 || questionCount > 0 || attemptCount > 0
+
   fun normalized(): HomeDashboardSnapshot = copy(
     topicCount = topicCount.coerceAtLeast(0),
     questionCount = questionCount.coerceAtLeast(0),
