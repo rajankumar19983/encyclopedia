@@ -8,3 +8,10 @@ fun List<RevisionItem>.revisionHealth(): RevisionHealth = when {
   size >= 15 -> RevisionHealth.BUILDING
   else -> RevisionHealth.LIGHT
 }
+
+fun RevisionHealth.guidance(): String = when (this) {
+  RevisionHealth.CLEAR -> "Keep practising to maintain recall."
+  RevisionHealth.LIGHT -> "A short revision session should keep the queue manageable."
+  RevisionHealth.BUILDING -> "Prioritise revision before adding too much new material."
+  RevisionHealth.HEAVY -> "Work through urgent questions first and use shorter focused sessions."
+}
