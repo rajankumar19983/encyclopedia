@@ -105,6 +105,44 @@ fun duplicateOcrWarning(drafts: List<ParsedQuestionDraft>): String? {
 
 data class OcrExitGuard(val requiresConfirmation: Boolean, val message: String?)
 
+data class OcrReviewNavigationGuard(
+  val blocked: Boolean,
+  val requiresConfirmation: Boolean,
+  val message: String?,
+)
+
+fun buildOcrReviewNavigationGuard(
+  drafts: List<OcrDraftReviewState>,
+  extractionInProgress: Boolean = false,
+): OcrReviewNavigationGuard {
+  if (extractionInProgress) {
+    return OcrReviewNavigationGuard(
+      blocked = true,
+      requiresConfirmation = false,
+      message = "Wait for OCR extraction to finish before leaving this screen.",
+    )
+  }
+  val saving = drafts.count { it.saveStatus == OcrDraftSaveStatus.SAVING }
+  if (saving > 0) {
+    return OcrReviewNavigationGuard(
+      blocked = true,
+      requiresConfirmation = false,
+      message = "Wait for $saving ${if (saving == 1) "question" else "questions"} to finish saving before leaving or choosing another source.",
+    )
+  }
+  val decisions = drafts.map { it.decision }
+  val pending = decisions.count { it == OcrReviewDecision.PENDING }
+  return OcrReviewNavigationGuard(
+    blocked = false,
+    requiresConfirmation = pending > 0,
+    message = if (pending > 0) {
+      "$pending OCR ${if (pending == 1) "draft has" else "drafts have"} no Approve/Reject decision. Continuing will discard this review state."
+    } else {
+      null
+    },
+  )
+}
+
 fun OcrReviewSession.exitGuard(): OcrExitGuard = if (pending > 0) {
   OcrExitGuard(true, "$pending OCR ${if (pending == 1) "draft has" else "drafts have"} no Approve/Reject decision. Leaving will discard this review state.")
 } else {

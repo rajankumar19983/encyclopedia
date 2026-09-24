@@ -1,5 +1,6 @@
 package com.rajankumar.encyclopaedia.feature.importer
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
@@ -19,16 +21,27 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+
+private enum class PendingImportNavigation { EXIT, PICK_IMAGES, PICK_PDF }
+
+private data class PendingImportNavigationRequest(
+  val action: PendingImportNavigation,
+  val guard: OcrReviewNavigationGuard,
+)
 
 @Composable
 fun QuestionImportScreen(onDone: () -> Unit) {
   val viewModel: ImportReviewViewModel = viewModel()
   val state = viewModel.uiState
   val checklistItems = remember { ocrReviewChecklist() }
+  var pendingNavigation by remember { mutableStateOf<PendingImportNavigationRequest?>(null) }
 
   val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
     viewModel.importImages(uris)
@@ -39,13 +52,53 @@ fun QuestionImportScreen(onDone: () -> Unit) {
 
   val decisions = state.drafts.map { it.review.decision }
   val summary = buildOcrReviewUiSummary(decisions)
+  val navigationGuard = buildOcrReviewNavigationGuard(
+    drafts = state.drafts.map { it.review },
+    extractionInProgress = state.busy,
+  )
+  fun performNavigation(action: PendingImportNavigation) {
+    when (action) {
+      PendingImportNavigation.EXIT -> onDone()
+      PendingImportNavigation.PICK_IMAGES -> imagePicker.launch("image/*")
+      PendingImportNavigation.PICK_PDF -> pdfPicker.launch("application/pdf")
+    }
+  }
+  fun requestNavigation(action: PendingImportNavigation) {
+    if (navigationGuard.blocked || navigationGuard.requiresConfirmation) {
+      pendingNavigation = PendingImportNavigationRequest(action, navigationGuard)
+    } else {
+      performNavigation(action)
+    }
+  }
+  BackHandler { requestNavigation(PendingImportNavigation.EXIT) }
+  pendingNavigation?.let { request ->
+    val guard = request.guard
+    AlertDialog(
+      onDismissRequest = { pendingNavigation = null },
+      title = { Text(if (guard.blocked) "Operation in progress" else "Discard unfinished review?") },
+      text = { Text(guard.message.orEmpty()) },
+      confirmButton = {
+        if (guard.blocked) {
+          TextButton(onClick = { pendingNavigation = null }) { Text("OK") }
+        } else {
+          TextButton(onClick = {
+            pendingNavigation = null
+            performNavigation(request.action)
+          }) { Text("Discard and continue", color = MaterialTheme.colorScheme.error) }
+        }
+      },
+      dismissButton = if (guard.blocked) null else {
+        { TextButton(onClick = { pendingNavigation = null }) { Text("Keep reviewing") } }
+      },
+    )
+  }
   Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
     Text("Import Questions", style = MaterialTheme.typography.headlineMedium)
     Text("Printed English text only. Select multiple images when a question set spans several scans. Source images are not stored and OCR drafts are never saved automatically.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-      Button(onClick = { imagePicker.launch("image/*") }, enabled = !state.busy) { Text("Choose Images") }
-      Button(onClick = { pdfPicker.launch("application/pdf") }, enabled = !state.busy) { Text("Choose PDF") }
-      TextButton(onClick = onDone) { Text("Back") }
+      Button(onClick = { requestNavigation(PendingImportNavigation.PICK_IMAGES) }, enabled = !state.busy) { Text("Choose Images") }
+      Button(onClick = { requestNavigation(PendingImportNavigation.PICK_PDF) }, enabled = !state.busy) { Text("Choose PDF") }
+      TextButton(onClick = { requestNavigation(PendingImportNavigation.EXIT) }) { Text("Back") }
     }
     Text(state.status)
     state.extractionNotices.forEach { Text("⚠ $it", color = MaterialTheme.colorScheme.error) }
