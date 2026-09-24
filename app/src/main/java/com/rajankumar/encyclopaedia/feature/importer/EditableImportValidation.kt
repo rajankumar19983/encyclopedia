@@ -16,8 +16,13 @@ fun EditableImportDraft.validateForSave(): EditableImportValidation {
     if (options.size > 6) add("At most six options are supported. Review OCR structure before saving.")
     if (!hasOnlyEnglishOcrContent()) add("Hindi/Devanagari OCR text must be removed before saving.")
     if (answer == null) add("Choose a correct option that exists in this question.")
+
     val qualityDraft = ParsedQuestionDraft(question.trim(), options, answer).withQualityWarnings()
-    addAll(qualityDraft.warnings)
+    addAll(
+      qualityDraft.warnings.filterNot { warning ->
+        warning == "Question does not contain usable English text." && question.isBlank()
+      }
+    )
   }.distinct()
   return EditableImportValidation(answer, issues)
 }
