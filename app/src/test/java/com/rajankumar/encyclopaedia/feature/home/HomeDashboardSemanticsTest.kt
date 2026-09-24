@@ -10,4 +10,5 @@ class HomeDashboardSemanticsTest {
     assertTrue(text.contains("1250 questions"))
     assertTrue(text.contains("68 percent"))
   }
+  @Test fun emptySummaryExplainsHowToBegin() = assertTrue(homeDashboardAccessibilitySummary(0, 0, 0, 0).contains("import PYQ"))
 }
