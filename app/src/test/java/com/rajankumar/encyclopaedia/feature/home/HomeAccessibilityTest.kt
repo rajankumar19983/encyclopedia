@@ -12,5 +12,5 @@ class HomeAccessibilityTest {
     val recommendation = HomePlanRecommendation("Review mistakes first", "Revisit incorrect questions.")
     assertEquals("Review mistakes first. Revisit incorrect questions.", recommendation.accessibilityDescription())
   }
-  @Test fun todayPlanReadsNextTask() = assertEquals("Today's plan. 1 of 2 tasks completed. Next task: DBMS revision.", HomeTodayPlan(1, 2, "DBMS revision").accessibilityDescription())
+  @Test fun todayPlanReadsProgressAndNextTask() = assertEquals("Today's plan. 1 of 2 tasks completed. 50 percent complete. Next task: DBMS revision.", HomeTodayPlan(1, 2, "DBMS revision").accessibilityDescription())
 }
