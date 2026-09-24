@@ -44,22 +44,28 @@ fun QuestionImportScreen(onDone: () -> Unit) {
   val context = LocalContext.current
   val dao = EncyclopaediaDatabase.get(context).dao()
   val scope = rememberCoroutineScope()
-  val imageEngine = remember { MlKitOcrEngine() }
-  val pdfEngine = remember { PdfOcrEngine() }
+  val documentImporter = remember(context.contentResolver) { OcrDocumentImporter(context.contentResolver) }
   val checklistItems = remember { ocrReviewChecklist() }
   var drafts by remember { mutableStateOf<List<ReviewDraft>>(emptyList()) }
   var rawText by remember { mutableStateOf("") }
   var preparation by remember { mutableStateOf<OcrImportPreparation?>(null) }
+  var extractionNotices by remember { mutableStateOf<List<String>>(emptyList()) }
   var status by remember { mutableStateOf("Choose an image or PDF containing printed MCQs.") }
   var busy by remember { mutableStateOf(false) }
   var filter by remember { mutableStateOf(OcrReviewFilter.ALL) }
 
-  fun review(text: String, source: String) {
+  fun review(document: OcrDocumentImport, source: String) {
+    val text = document.extraction.combinedText
     rawText = text
+    extractionNotices = document.allNotices()
     val prepared = prepareOcrImport(text)
     preparation = prepared
     drafts = prepared.drafts.map { ReviewDraft(it, source, prepared.metadata) }
-    status = prepared.report().message()
+    status = when {
+      document.extraction.failedPages.isNotEmpty() -> "OCR completed with ${document.extraction.failedPages.size} page failure(s). Review warnings below."
+      prepared.drafts.isEmpty() -> "OCR completed, but no reviewable MCQs were parsed."
+      else -> prepared.report().message()
+    }
   }
 
   val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -67,7 +73,8 @@ fun QuestionImportScreen(onDone: () -> Unit) {
       busy = true
       status = "Reading printed text from image…"
       scope.launch {
-        runCatching { imageEngine.recognize(context, uri) }.onSuccess { review(it, "SCAN") }
+        runCatching { documentImporter.importImage(uri) }
+          .onSuccess { review(it, "SCAN") }
           .onFailure { status = "Image OCR failed: ${it.message ?: "unknown error"}" }
         busy = false
       }
@@ -76,10 +83,11 @@ fun QuestionImportScreen(onDone: () -> Unit) {
   val pdfPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
     if (uri != null) {
       busy = true
-      status = "Opening PDF…"
+      status = "Reading PDF pages…"
       scope.launch {
-        runCatching { pdfEngine.recognize(context, uri) { page, total -> status = "Reading PDF page $page of $total…" } }
-          .onSuccess { review(it, "PDF") }.onFailure { status = "PDF OCR failed: ${it.message ?: "unknown error"}" }
+        runCatching { documentImporter.importPdf(uri) }
+          .onSuccess { review(it, "PDF") }
+          .onFailure { status = "PDF OCR failed: ${it.message ?: "unknown error"}" }
         busy = false
       }
     }
@@ -96,6 +104,7 @@ fun QuestionImportScreen(onDone: () -> Unit) {
       TextButton(onClick = onDone) { Text("Back") }
     }
     Text(status)
+    extractionNotices.forEach { Text("⚠ $it", color = MaterialTheme.colorScheme.error) }
     preparation?.let { prepared ->
       prepared.sanitized.summary().message()?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
       prepared.diagnostics.message()?.let { Text("⚠ $it", color = MaterialTheme.colorScheme.error) }
