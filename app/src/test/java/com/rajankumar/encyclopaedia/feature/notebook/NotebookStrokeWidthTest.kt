@@ -1,9 +1,17 @@
 package com.rajankumar.encyclopaedia.feature.notebook
 
-import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NotebookStrokeWidthTest {
-  @Test fun strokeWidthIsBounded() { assertEquals(1f, sanitizeStrokeWidth(-2f)); assertEquals(32f, sanitizeStrokeWidth(100f)) }
-  @Test fun invalidStrokeWidthUsesDefault() = assertEquals(4f, sanitizeStrokeWidth(Float.NaN))
+  @Test fun acceptsSupportedStrokeWidths() {
+    assertTrue(isValidStrokeWidth(1f))
+    assertTrue(isValidStrokeWidth(32f))
+  }
+
+  @Test fun rejectsInvalidStrokeWidths() {
+    assertFalse(isValidStrokeWidth(-2f))
+    assertFalse(isValidStrokeWidth(Float.NaN))
+  }
 }
