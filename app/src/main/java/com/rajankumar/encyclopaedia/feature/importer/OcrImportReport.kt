@@ -10,6 +10,6 @@ data class OcrImportReport(
 fun OcrImportPreparation.report(): OcrImportReport = OcrImportReport(
   draftCount = drafts.size,
   removedLineCount = sanitized.removedLines.size,
-  metadataConfidence = metadata.confidence(),
+  metadataConfidence = metadata.confidence,
   structuralWarning = diagnostics.message(),
 )
