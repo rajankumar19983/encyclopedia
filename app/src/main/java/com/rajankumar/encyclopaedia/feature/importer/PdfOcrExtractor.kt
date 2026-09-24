@@ -11,7 +11,11 @@ class PdfOcrExtractor(private val contentResolver: ContentResolver) {
   suspend fun extract(uri: Uri): OcrExtractionResult {
     val descriptor = contentResolver.openFileDescriptor(uri, "r")
       ?: return OcrExtractionResult(OcrSourceKind.PDF, listOf(OcrPageText(1, "", "Unable to open PDF.")))
-    return descriptor.use(::extractDescriptor)
+    return try {
+      extractDescriptor(descriptor)
+    } finally {
+      descriptor.close()
+    }
   }
 
   private suspend fun extractDescriptor(descriptor: ParcelFileDescriptor): OcrExtractionResult =
