@@ -9,7 +9,7 @@ data class ManualQuestionDraft(val question: String, val optionsText: String, va
     question.isBlank() -> "Enter the question text."
     options.size !in 2..6 -> "Enter between 2 and 6 options, one per line."
     normalizedAnswer.isBlank() -> "Enter the correct option."
-    answerIndex !in options.indices -> "The correct answer must point to one of the listed options."
+    answerIndex == null || answerIndex !in options.indices -> "The correct answer must point to one of the listed options."
     else -> null
   }
 
