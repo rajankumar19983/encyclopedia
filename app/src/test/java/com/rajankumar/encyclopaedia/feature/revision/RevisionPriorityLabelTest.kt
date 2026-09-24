@@ -4,5 +4,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class RevisionPriorityLabelTest {
-  @Test fun labelsPriorities() { assertEquals("Low priority", RevisionPriority.LOW.label()); assertEquals("Needs revision", RevisionPriority.MEDIUM.label()); assertEquals("High priority", RevisionPriority.HIGH.label()) }
+  @Test fun labelsPriorities() {
+    assertEquals("Urgent priority", RevisionPriority.URGENT.displayLabel())
+    assertEquals("High priority", RevisionPriority.HIGH.displayLabel())
+    assertEquals("Normal priority", RevisionPriority.NORMAL.displayLabel())
+    assertEquals("Low priority", RevisionPriority.LOW.displayLabel())
+  }
 }
