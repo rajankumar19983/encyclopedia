@@ -27,6 +27,19 @@ internal fun List<ReviewDraft>.updateDraft(
   if (draftIndex == index) transform(draft) else draft
 }
 
+internal fun ReviewDraft.toQuestionEntity(id: String): QuestionEntity {
+  val validation = edit.validation()
+  return QuestionEntity(
+    id = id,
+    questionText = edit.question.trim(),
+    options = edit.editable().cleanedOptions.joinToString("\n"),
+    correctAnswer = validation.normalizedAnswer.orEmpty(),
+    explanation = parsed.explanation,
+    source = importSourceLabel(source, metadata),
+    difficulty = "UNRATED",
+  )
+}
+
 internal data class ImportReviewUiState(
   val drafts: List<ReviewDraft> = emptyList(),
   val rawText: String = "",
@@ -102,20 +115,11 @@ class ImportReviewViewModel(application: Application) : AndroidViewModel(applica
     val validation = draft.edit.validation()
     val gate = evaluateOcrApproval(validation, draft.review.checklist, ocrReviewChecklist())
     if (!gate.allowed) return
-    val options = draft.edit.editable().cleanedOptions
     updateDraft(index) { it.copy(review = it.review.copy(saveStatus = OcrDraftSaveStatus.SAVING)) }
     viewModelScope.launch {
       runCatching {
         dao.saveImportedQuestionIfUnique(
-          QuestionEntity(
-            id = UUID.randomUUID().toString(),
-            questionText = draft.edit.question.trim(),
-            options = options.joinToString("\n"),
-            correctAnswer = validation.normalizedAnswer.orEmpty(),
-            explanation = draft.parsed.explanation,
-            source = draft.source,
-            difficulty = "UNRATED",
-          ),
+          draft.toQuestionEntity(UUID.randomUUID().toString()),
           null,
         )
       }.onSuccess { inserted ->
