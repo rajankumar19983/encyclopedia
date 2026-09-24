@@ -77,7 +77,7 @@ fun QuestionImportScreen(onDone: () -> Unit) {
         val gate = evaluateOcrApproval(validation, initial.review.checklist, checklistItems)
         Card(Modifier.fillMaxWidth()) {
           Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Draft ${index + 1} • ${importSourceLabel(initial.source, initial.metadata)}", style = MaterialTheme.typography.titleMedium)
+            Text("Draft ${index + 1} • ${initial.editableSource.ifBlank { initial.source }}", style = MaterialTheme.typography.titleMedium)
             Text(initial.review.decision.accessibilityLabel(index + 1), style = MaterialTheme.typography.bodySmall)
             Text(sourceMetadataSummary(initial.metadata), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             OutlinedTextField(
@@ -85,25 +85,26 @@ fun QuestionImportScreen(onDone: () -> Unit) {
               onValueChange = { viewModel.updateSource(index, it) },
               label = { Text("Source / exam / year") },
               supportingText = { Text("Correct OCR-detected attribution before saving when needed.") },
+              enabled = initial.editable,
               modifier = Modifier.fillMaxWidth(),
             )
             validation.issues.forEach { Text("⚠ $it", color = MaterialTheme.colorScheme.error) }
             OutlinedTextField(edit.question, { value ->
               viewModel.updateQuestion(index, value)
-            }, label = { Text("Question") }, modifier = Modifier.fillMaxWidth())
+            }, label = { Text("Question") }, enabled = initial.editable, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(edit.optionsText, { value ->
               viewModel.updateOptions(index, value)
-            }, label = { Text("Options — one per line (2 or more)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+            }, label = { Text("Options — one per line (2 or more)") }, enabled = initial.editable, modifier = Modifier.fillMaxWidth(), minLines = 2)
             edit.editable().optionPreview().forEach { option -> Text("${option.label}. ${option.text}", style = MaterialTheme.typography.bodySmall) }
             OutlinedTextField(edit.answer, { value ->
               viewModel.updateAnswer(index, value)
-            }, label = { Text("Correct option (A, B… or 1, 2…)") })
+            }, label = { Text("Correct option (A, B… or 1, 2…)") }, enabled = initial.editable)
             Text("Manual verification", style = MaterialTheme.typography.titleSmall)
             checklistItems.forEachIndexed { checkIndex, item ->
               Row {
                 Checkbox(
                   checked = checkIndex in initial.review.checklist.checked,
-                  enabled = initial.review.decision == OcrReviewDecision.PENDING,
+                  enabled = initial.editable,
                   onCheckedChange = {
                     viewModel.toggleChecklistItem(index, checkIndex)
                   },
@@ -118,9 +119,11 @@ fun QuestionImportScreen(onDone: () -> Unit) {
               Button(enabled = gate.allowed && initial.review.saveStatus != OcrDraftSaveStatus.SAVING && initial.review.decision == OcrReviewDecision.PENDING, onClick = {
                 viewModel.save(index)
               }) { Text(initial.review.saveStatus.label()) }
-              TextButton(enabled = initial.review.decision == OcrReviewDecision.PENDING, onClick = {
-                viewModel.reject(index)
-              }) { Text(if (initial.review.decision == OcrReviewDecision.REJECTED) "Rejected" else "Reject") }
+              if (initial.review.decision == OcrReviewDecision.REJECTED) {
+                TextButton(onClick = { viewModel.restore(index) }) { Text("Restore to review") }
+              } else {
+                TextButton(enabled = initial.editable, onClick = { viewModel.reject(index) }) { Text("Reject") }
+              }
             }
             when {
               initial.review.decision == OcrReviewDecision.APPROVED -> Text("Approved and saved to the Question Bank.", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)

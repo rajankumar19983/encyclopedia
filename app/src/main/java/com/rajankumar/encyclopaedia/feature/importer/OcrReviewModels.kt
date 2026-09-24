@@ -49,6 +49,8 @@ data class OcrReviewBatchState(val drafts: List<OcrDraftReviewState>) {
 
 data class OcrReviewGate(val canReview: Boolean, val reasons: List<String>)
 
+const val OCR_SOURCE_CHECKLIST_INDEX = 3
+
 fun ocrReviewChecklist(): List<OcrReviewChecklistItem> = listOf(
   OcrReviewChecklistItem("Question text matches the printed source"),
   OcrReviewChecklistItem("All options are present and in the correct order"),

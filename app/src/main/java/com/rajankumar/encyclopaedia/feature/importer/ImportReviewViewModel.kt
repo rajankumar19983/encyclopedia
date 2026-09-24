@@ -19,7 +19,47 @@ internal data class ReviewDraft(
   val review: OcrDraftReviewState = OcrDraftReviewState(),
   val edit: OcrDraftEditState = parsed.toEditState(),
   val editableSource: String = importSourceLabel(source, metadata),
-)
+) {
+  val editable: Boolean
+    get() = review.decision == OcrReviewDecision.PENDING &&
+      review.saveStatus != OcrDraftSaveStatus.SAVING
+}
+
+internal fun ReviewDraft.updateReviewedContent(
+  transform: (OcrDraftEditState) -> OcrDraftEditState,
+): ReviewDraft = if (editable) {
+  copy(
+    edit = transform(edit),
+    review = review.copy(
+      checklist = OcrReviewChecklistState(),
+      saveStatus = OcrDraftSaveStatus.READY,
+    ),
+  )
+} else {
+  this
+}
+
+internal fun ReviewDraft.updateReviewedSource(value: String): ReviewDraft = if (editable) {
+  copy(
+    editableSource = value,
+    review = review.copy(
+      checklist = review.checklist.copy(checked = review.checklist.checked - OCR_SOURCE_CHECKLIST_INDEX),
+      saveStatus = OcrDraftSaveStatus.READY,
+    ),
+  )
+} else {
+  this
+}
+
+internal fun ReviewDraft.restoreForReview(): ReviewDraft =
+  if (review.decision == OcrReviewDecision.REJECTED) {
+    copy(review = review.copy(
+      decision = OcrReviewDecision.PENDING,
+      saveStatus = OcrDraftSaveStatus.READY,
+    ))
+  } else {
+    this
+  }
 
 internal fun List<ReviewDraft>.updateDraft(
   index: Int,
@@ -91,27 +131,35 @@ class ImportReviewViewModel(application: Application) : AndroidViewModel(applica
   }
 
   fun updateQuestion(index: Int, value: String) = updateDraft(index) {
-    it.copy(edit = it.edit.copy(question = value))
+    it.updateReviewedContent { edit -> edit.copy(question = value) }
   }
 
   fun updateOptions(index: Int, value: String) = updateDraft(index) {
-    it.copy(edit = it.edit.copy(optionsText = value))
+    it.updateReviewedContent { edit -> edit.copy(optionsText = value) }
   }
 
   fun updateAnswer(index: Int, value: String) = updateDraft(index) {
-    it.copy(edit = it.edit.copy(answer = value.take(2).uppercase()))
+    it.updateReviewedContent { edit -> edit.copy(answer = value.take(2).uppercase()) }
   }
 
   fun updateSource(index: Int, value: String) = updateDraft(index) {
-    it.copy(editableSource = value)
+    it.updateReviewedSource(value)
   }
 
   fun toggleChecklistItem(index: Int, checkIndex: Int) = updateDraft(index) {
-    it.copy(review = it.review.copy(checklist = it.review.checklist.toggle(checkIndex)))
+    if (it.editable) {
+      it.copy(review = it.review.copy(checklist = it.review.checklist.toggle(checkIndex)))
+    } else {
+      it
+    }
   }
 
   fun reject(index: Int) = updateDraft(index) {
-    it.copy(review = it.review.copy(decision = OcrReviewDecision.REJECTED))
+    if (it.editable) it.copy(review = it.review.copy(decision = OcrReviewDecision.REJECTED)) else it
+  }
+
+  fun restore(index: Int) = updateDraft(index) {
+    it.restoreForReview()
   }
 
   fun save(index: Int) {
