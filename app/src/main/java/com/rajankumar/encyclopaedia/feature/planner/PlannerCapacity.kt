@@ -5,9 +5,10 @@ import com.rajankumar.encyclopaedia.data.local.PlannerTaskEntity
 data class PlannerCapacity(val suggestedAdditionalTasks: Int, val message: String)
 
 fun List<PlannerTaskEntity>.plannerCapacity(targetPending: Int = 5): PlannerCapacity {
+  val safeTarget = targetPending.coerceAtLeast(0)
   val pending = count { !it.isCompleted }
   val carried = count { !it.isCompleted && it.carriedFromDate != null }
-  val room = (targetPending - pending).coerceAtLeast(0)
+  val room = (safeTarget - pending).coerceAtLeast(0)
   val suggested = if (carried >= 3) 0 else room
   val message = when {
     suggested == 0 && pending > 0 -> "Focus on the current plan before adding more work."
