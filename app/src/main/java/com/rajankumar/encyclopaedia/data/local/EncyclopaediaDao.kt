@@ -17,11 +17,13 @@ interface EncyclopaediaDao {
   @Query("SELECT * FROM knowledge_nodes ORDER BY createdAt") suspend fun getAllNodesForBackup(): List<KnowledgeNodeEntity>
   @Query("SELECT COUNT(*) FROM knowledge_nodes WHERE isArchived = 0") fun observeTopicCount(): Flow<Int>
   @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertNode(node: KnowledgeNodeEntity)
+  @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertKnowledgeNodes(nodes: List<KnowledgeNodeEntity>)
   @Update suspend fun updateNode(node: KnowledgeNodeEntity)
   @Query("UPDATE knowledge_nodes SET isArchived = 1, updatedAt = :now WHERE id = :id") suspend fun archiveNode(id: String, now: Long = System.currentTimeMillis())
   @Query("SELECT * FROM lessons WHERE knowledgeNodeId = :nodeId AND isArchived = 0 ORDER BY sortOrder, title") fun observeLessons(nodeId: String): Flow<List<LessonEntity>>
   @Query("SELECT * FROM lessons ORDER BY createdAt") suspend fun getAllLessonsForBackup(): List<LessonEntity>
   @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertLesson(lesson: LessonEntity)
+  @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertLessons(lessons: List<LessonEntity>)
   @Query("UPDATE lessons SET isArchived = 1, updatedAt = :now WHERE id = :id") suspend fun archiveLesson(id: String, now: Long = System.currentTimeMillis())
   @Query("SELECT * FROM questions ORDER BY createdAt DESC") fun observeQuestions(): Flow<List<QuestionEntity>>
   @Query("SELECT COUNT(*) FROM questions") fun observeQuestionCount(): Flow<Int>
@@ -88,6 +90,7 @@ interface EncyclopaediaDao {
   @Query("DELETE FROM notebook_layers") suspend fun deleteAllNotebookLayersForRestore()
   @Query("DELETE FROM notebook_pages") suspend fun deleteAllNotebookPagesForRestore()
   @Transaction suspend fun restoreSnapshot(snapshot: BackupSnapshot) { require(snapshot.isInternallyConsistent()); deleteAllNotebookStrokesForRestore(); deleteAllNotebookLayersForRestore(); deleteAllNotebookPagesForRestore(); deleteAllAttemptsForRestore(); deleteAllQuestionTopicsForRestore(); deleteAllQuestionsForRestore(); deleteAllLessonsForRestore(); deleteAllNodesForRestore(); deleteAllPlannerTasksForRestore(); snapshot.knowledgeNodes.forEach { upsertNode(it) }; snapshot.lessons.forEach { upsertLesson(it) }; snapshot.questions.forEach { upsertQuestion(it) }; snapshot.questionTopics.forEach { upsertQuestionTopic(it) }; snapshot.attempts.forEach { insertAttempt(it) }; snapshot.plannerTasks.forEach { upsertPlannerTask(it) }; snapshot.notebookPages.forEach { upsertNotebookPage(it) }; snapshot.notebookLayers.forEach { upsertNotebookLayer(it) }; snapshot.notebookStrokes.forEach { upsertNotebookStroke(it) } }
+  @Transaction suspend fun saveApprovedKnowledge(nodes: List<KnowledgeNodeEntity>, lessons: List<LessonEntity>) { require(nodes.isNotEmpty()); insertKnowledgeNodes(nodes); if (lessons.isNotEmpty()) insertLessons(lessons) }
   @Transaction suspend fun saveQuestion(question: QuestionEntity, topicId: String?) { upsertQuestion(question); clearQuestionTopics(question.id); if (topicId != null) upsertQuestionTopic(QuestionTopicEntity(question.id, topicId)) }
   @Transaction suspend fun saveImportedQuestionIfUnique(question: QuestionEntity, topicId: String?): Boolean { val q=importFingerprint(question.questionText); val opts=question.options.lines().map(::importFingerprint).filter{it.isNotBlank()}; if(getAllQuestionsOnce().any{importFingerprint(it.questionText)==q && it.options.lines().map(::importFingerprint).filter{x->x.isNotBlank()}==opts}) return false; saveQuestion(question,topicId); return true }
 }
