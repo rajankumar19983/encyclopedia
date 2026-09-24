@@ -14,14 +14,18 @@ class RevisionPracticeRequestTest {
   @Test
   fun requestRemovesDuplicateQuestionIds() {
     RevisionPracticeRequest.set(listOf("q1", "q2", "q1"))
-
     assertEquals(listOf("q1", "q2"), RevisionPracticeRequest.consume())
+  }
+
+  @Test
+  fun requestTrimsAndDropsBlankIds() {
+    RevisionPracticeRequest.set(listOf(" q1 ", "", "   ", "q1"))
+    assertEquals(listOf("q1"), RevisionPracticeRequest.consume())
   }
 
   @Test
   fun consumeClearsPendingRequest() {
     RevisionPracticeRequest.set(listOf("q1"))
-
     assertEquals(listOf("q1"), RevisionPracticeRequest.consume())
     assertTrue(RevisionPracticeRequest.consume().isEmpty())
   }
