@@ -3,10 +3,7 @@ package com.rajankumar.encyclopaedia.feature.revision
 import com.rajankumar.encyclopaedia.data.local.QuestionEntity
 
 enum class RevisionPriority(val label: String) {
-  URGENT("Urgent"),
-  HIGH("High"),
-  NORMAL("Normal"),
-  LOW("Low")
+  URGENT("Urgent"), HIGH("High"), NORMAL("Normal"), LOW("Low")
 }
 
 enum class RevisionReason(val label: String) {
@@ -23,4 +20,8 @@ data class RevisionItem(
   val attempts: Int,
   val priority: RevisionPriority,
   val reasons: Set<RevisionReason>
-)
+) {
+  val mistakeRatePercent: Int get() = revisionMistakeRatePercent(mistakes, attempts)
+  val accuracyPercent: Int get() = revisionAccuracyPercent((attempts - mistakes).coerceAtLeast(0), attempts)
+  val reasonSummary: String get() = reasons.revisionReasonSummary()
+}
