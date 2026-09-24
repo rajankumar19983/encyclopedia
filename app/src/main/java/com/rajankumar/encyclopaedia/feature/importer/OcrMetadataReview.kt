@@ -5,7 +5,7 @@ data class OcrMetadataReview(val confidence: OcrMetadataConfidence, val message:
 fun OcrSourceMetadata.reviewGuidance(): OcrMetadataReview = when (confidence) {
   OcrMetadataConfidence.HIGH -> OcrMetadataReview(
     OcrMetadataConfidence.HIGH,
-    "Exam metadata was detected with high confidence. Verify it before saving."
+    "Exam metadata was detected with high confidence. Please verify it before saving."
   )
   OcrMetadataConfidence.MEDIUM -> OcrMetadataReview(
     OcrMetadataConfidence.MEDIUM,
