@@ -1,7 +1,6 @@
 package com.rajankumar.encyclopaedia.feature.home
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Test
 
 class HomeDashboardStateTest {
@@ -11,5 +10,8 @@ class HomeDashboardStateTest {
     assertEquals("Expand your coverage", state.recommendation.title)
     assertEquals("80%", state.stats.last().value)
     assertTrue(state.motivation.isNotBlank())
+    assertFalse(state.emptyState.visible)
   }
+
+  @Test fun emptyDashboardExposesOnboarding() = assertTrue(buildHomeDashboardState(0, 0, 0, 0, 0).emptyState.visible)
 }
