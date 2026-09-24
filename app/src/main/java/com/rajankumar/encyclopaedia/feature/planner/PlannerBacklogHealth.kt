@@ -15,9 +15,10 @@ fun List<PlannerTaskEntity>.backlogHealth(): PlannerBacklogHealth {
   }
 }
 
-fun PlannerBacklogHealth.label(): String = when (this) {
-  PlannerBacklogHealth.CLEAR -> "Clear"
-  PlannerBacklogHealth.MANAGEABLE -> "Manageable"
-  PlannerBacklogHealth.BUILDING -> "Building"
-  PlannerBacklogHealth.OVERLOADED -> "Overloaded"
+fun PlannerBacklogHealth.label(): String = name.lowercase().replaceFirstChar(Char::uppercase)
+fun PlannerBacklogHealth.guidance(): String = when (this) {
+  PlannerBacklogHealth.CLEAR -> "Plan a focused set of tasks for today."
+  PlannerBacklogHealth.MANAGEABLE -> "Your pending work is manageable."
+  PlannerBacklogHealth.BUILDING -> "Finish carried tasks before adding much more work."
+  PlannerBacklogHealth.OVERLOADED -> "Reduce the backlog before planning new tasks."
 }
