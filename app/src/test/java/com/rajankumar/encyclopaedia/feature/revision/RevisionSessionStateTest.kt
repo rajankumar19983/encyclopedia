@@ -16,6 +16,7 @@ class RevisionSessionStateTest {
     val afterFirst = initial.markCompleted("q1")
     assertEquals("q2", afterFirst.nextQuestionId())
     assertEquals(1, afterFirst.progress.completed)
+    assertEquals("1 of 2 completed", afterFirst.progress.summary)
     assertFalse(afterFirst.isComplete)
 
     val complete = afterFirst.markCompleted("q2")
