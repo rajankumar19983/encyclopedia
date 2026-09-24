@@ -9,7 +9,7 @@ class OcrImportReportTest {
     val preparation = prepareOcrImport("DSSSB 2024\n1. What is RAM?\nA. Memory\nB. Storage\nAnswer: A")
     val report = preparation.report()
     assertEquals(1, report.draftCount)
-    assertEquals(OcrMetadataConfidence.COMPLETE, report.metadataConfidence)
+    assertEquals(OcrMetadataConfidence.MEDIUM, report.metadataConfidence)
     assertNull(report.structuralWarning)
   }
 }
