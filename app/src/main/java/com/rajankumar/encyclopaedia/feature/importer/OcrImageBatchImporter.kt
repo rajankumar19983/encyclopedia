@@ -17,11 +17,9 @@ suspend fun OcrDocumentImporter.importImages(
 
 fun combineImageImports(documents: List<OcrDocumentImport>): OcrDocumentImport {
   require(documents.isNotEmpty()) { "At least one OCR document is required." }
-  val pages = documents.flatMapIndexed { documentIndex, document ->
-    document.extraction.orderedPages.mapIndexed { pageIndex, page ->
-      page.copy(pageNumber = documentIndex + pageIndex + 1)
-    }
-  }
+  val pages = documents
+    .flatMap { it.extraction.orderedPages }
+    .mapIndexed { index, page -> page.copy(pageNumber = index + 1) }
   val extraction = OcrExtractionResult(OcrSourceKind.IMAGE, pages)
   return OcrDocumentImport(extraction, prepareOcrImportReview(extraction.combinedText))
 }
