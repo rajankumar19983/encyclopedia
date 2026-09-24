@@ -1,6 +1,6 @@
 package com.rajankumar.encyclopaedia.feature.knowledge
 
-interface AiProvider {
+fun interface AiProvider {
   suspend fun generate(request: AiGenerationRequest): AiGenerationResult
 }
 
