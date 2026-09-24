@@ -38,4 +38,30 @@ class ImportReviewPersistenceTest {
     assertEquals("SCAN", question.source)
     assertEquals("B", question.correctAnswer)
   }
+
+  @Test
+  fun savedQuestionUsesSourceCorrectedDuringReview() {
+    val draft = ReviewDraft(
+      parsed = ParsedQuestionDraft("Choose the answer", listOf("One", "Two"), "A"),
+      source = "PDF",
+      metadata = OcrSourceMetadata(examName = "DSSSB", year = 2024),
+      editableSource = "DSSSB TGT Computer Science • 2023 • Shift 2",
+    )
+
+    val question = draft.toQuestionEntity("question-3")
+
+    assertEquals("DSSSB TGT Computer Science • 2023 • Shift 2", question.source)
+  }
+
+  @Test
+  fun blankCorrectedSourceFallsBackToInputKind() {
+    val draft = ReviewDraft(
+      parsed = ParsedQuestionDraft("Choose the answer", listOf("One", "Two"), "A"),
+      source = "PDF",
+      metadata = OcrSourceMetadata(examName = "DSSSB", year = 2024),
+      editableSource = "   ",
+    )
+
+    assertEquals("PDF", draft.toQuestionEntity("question-4").source)
+  }
 }

@@ -18,6 +18,7 @@ internal data class ReviewDraft(
   val metadata: OcrSourceMetadata,
   val review: OcrDraftReviewState = OcrDraftReviewState(),
   val edit: OcrDraftEditState = parsed.toEditState(),
+  val editableSource: String = importSourceLabel(source, metadata),
 )
 
 internal fun List<ReviewDraft>.updateDraft(
@@ -35,7 +36,7 @@ internal fun ReviewDraft.toQuestionEntity(id: String): QuestionEntity {
     options = edit.editable().cleanedOptions.joinToString("\n"),
     correctAnswer = validation.normalizedAnswer.orEmpty(),
     explanation = parsed.explanation,
-    source = importSourceLabel(source, metadata),
+    source = editableSource.trim().ifBlank { source },
     difficulty = "UNRATED",
   )
 }
@@ -99,6 +100,10 @@ class ImportReviewViewModel(application: Application) : AndroidViewModel(applica
 
   fun updateAnswer(index: Int, value: String) = updateDraft(index) {
     it.copy(edit = it.edit.copy(answer = value.take(2).uppercase()))
+  }
+
+  fun updateSource(index: Int, value: String) = updateDraft(index) {
+    it.copy(editableSource = value)
   }
 
   fun toggleChecklistItem(index: Int, checkIndex: Int) = updateDraft(index) {

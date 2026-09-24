@@ -80,6 +80,13 @@ fun QuestionImportScreen(onDone: () -> Unit) {
             Text("Draft ${index + 1} • ${importSourceLabel(initial.source, initial.metadata)}", style = MaterialTheme.typography.titleMedium)
             Text(initial.review.decision.accessibilityLabel(index + 1), style = MaterialTheme.typography.bodySmall)
             Text(sourceMetadataSummary(initial.metadata), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedTextField(
+              value = initial.editableSource,
+              onValueChange = { viewModel.updateSource(index, it) },
+              label = { Text("Source / exam / year") },
+              supportingText = { Text("Correct OCR-detected attribution before saving when needed.") },
+              modifier = Modifier.fillMaxWidth(),
+            )
             validation.issues.forEach { Text("⚠ $it", color = MaterialTheme.colorScheme.error) }
             OutlinedTextField(edit.question, { value ->
               viewModel.updateQuestion(index, value)
