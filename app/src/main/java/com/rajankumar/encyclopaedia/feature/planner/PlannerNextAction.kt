@@ -2,7 +2,9 @@ package com.rajankumar.encyclopaedia.feature.planner
 
 import com.rajankumar.encyclopaedia.data.local.PlannerTaskEntity
 
-data class PlannerNextAction(val taskId: String, val title: String, val reason: String)
+data class PlannerNextAction(val taskId: String, val title: String, val reason: String) {
+  val accessibilityText: String get() = "Next task: $title. $reason"
+}
 
 fun List<PlannerTaskEntity>.plannerNextAction(): PlannerNextAction? {
   val priority = plannerPriorities(limit = 1).firstOrNull() ?: return null
