@@ -4,7 +4,9 @@ data class HomeMetrics(
   val accuracyPercent: Int,
   val coveragePercent: Int,
   val remainingQuestions: Int
-)
+) {
+  val practiceComplete: Boolean get() = remainingQuestions == 0 && coveragePercent == 100
+}
 
 fun calculateHomeMetrics(questionCount: Int, attemptCount: Int, correctCount: Int, practisedCount: Int): HomeMetrics {
   val accuracy = if (attemptCount > 0) (correctCount * 100f / attemptCount).toInt().coerceIn(0, 100) else 0
