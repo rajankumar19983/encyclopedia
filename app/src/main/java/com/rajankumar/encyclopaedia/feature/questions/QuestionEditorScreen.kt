@@ -34,8 +34,10 @@ fun QuestionEditorScreen(onDone: () -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
       Button(enabled = draft.isValid(), onClick = {
         scope.launch {
-          dao.insertQuestion(QuestionEntity(UUID.randomUUID().toString(), question.trim(), draft.options.joinToString("\n"), draft.normalizedAnswer, explanation.trim(), "USER", "UNRATED"))
-          question = ""; options = ""; answer = ""; explanation = ""; status = "Question saved."
+          val inserted = dao.saveImportedQuestionIfUnique(QuestionEntity(UUID.randomUUID().toString(), question.trim(), draft.options.joinToString("\n"), draft.normalizedAnswer, explanation.trim(), "USER", "UNRATED"), null)
+          if (inserted) {
+            question = ""; options = ""; answer = ""; explanation = ""; status = "Question saved."
+          } else status = "This question already exists in the Question Bank."
         }
       }) { Text("Save Question") }
       TextButton(onClick = onDone) { Text("Back") }
