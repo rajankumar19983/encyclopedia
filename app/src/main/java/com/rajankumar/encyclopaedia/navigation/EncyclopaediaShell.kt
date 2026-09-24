@@ -12,18 +12,11 @@ import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.*
 import com.rajankumar.encyclopaedia.feature.accessibility.AccessibilitySettingsScreen
 import com.rajankumar.encyclopaedia.feature.backup.BackupScreen
 import com.rajankumar.encyclopaedia.feature.common.FeaturePlaceholderScreen
@@ -34,11 +27,9 @@ import com.rajankumar.encyclopaedia.feature.performance.PerformanceScreen
 import com.rajankumar.encyclopaedia.feature.planner.PlannerScreen
 import com.rajankumar.encyclopaedia.feature.questions.PracticeScreen
 import com.rajankumar.encyclopaedia.feature.questions.QuestionBankScreen
+import com.rajankumar.encyclopaedia.feature.questions.QuestionEditorScreen
 import com.rajankumar.encyclopaedia.feature.revision.RevisionScreen
-import com.rajankumar.encyclopaedia.feature.teacher.TeacherChatSheet
-import com.rajankumar.encyclopaedia.feature.teacher.TeacherConversation
-import com.rajankumar.encyclopaedia.feature.teacher.TeacherLauncher
-import com.rajankumar.encyclopaedia.feature.teacher.TeacherResponderRegistry
+import com.rajankumar.encyclopaedia.feature.teacher.*
 import kotlinx.coroutines.launch
 
 @Composable
@@ -47,7 +38,6 @@ fun EncyclopaediaShell(navController: NavHostController, useNavigationRail: Bool
   val currentRoute = backStackEntry?.destination?.route
   val scope = rememberCoroutineScope()
   var teacherOpen by remember { mutableStateOf(false) }
-
   Box(Modifier.fillMaxSize()) {
     if (useNavigationRail) {
       Row(Modifier.fillMaxSize()) {
@@ -60,45 +50,27 @@ fun EncyclopaediaShell(navController: NavHostController, useNavigationRail: Bool
       }
     } else {
       val compact = listOf(AppDestination.Home, AppDestination.Learn, AppDestination.Questions, AppDestination.Revision, AppDestination.Settings)
-      Scaffold(bottomBar = { NavigationBar { compact.forEach { destination -> NavigationBarItem(selected = currentRoute == destination.route, onClick = { navigateSingleTop(navController, destination.route) }, icon = { Icon(destination.icon, destination.label) }, label = { Text(destination.label) }) } } }) { padding ->
-        Box(Modifier.padding(padding)) { EncyclopaediaNavHost(navController) }
-      }
+      Scaffold(bottomBar = { NavigationBar { compact.forEach { destination -> NavigationBarItem(selected = currentRoute == destination.route, onClick = { navigateSingleTop(navController, destination.route) }, icon = { Icon(destination.icon, destination.label) }, label = { Text(destination.label) }) } } }) { padding -> Box(Modifier.padding(padding)) { EncyclopaediaNavHost(navController) } }
     }
-
     Box(Modifier.padding(20.dp)) { TeacherLauncher(onClick = { teacherOpen = true }) }
   }
-
-  if (teacherOpen) {
-    TeacherChatSheet(
-      onDismiss = { teacherOpen = false },
-      onSend = { request ->
-        val responder = TeacherResponderRegistry.responder
-        if (responder == null) {
-          TeacherConversation.addTeacherMessage("AI connection is not configured yet. Your question and current screen context are ready to send once a provider is connected.")
-        } else {
-          scope.launch {
-            responder.respond(request)
-              .onSuccess(TeacherConversation::addTeacherMessage)
-              .onFailure { TeacherConversation.addTeacherMessage("I couldn't get a response. Please try again.") }
-          }
-        }
-      }
-    )
-  }
+  if (teacherOpen) TeacherChatSheet(onDismiss = { teacherOpen = false }, onSend = { request ->
+    val responder = TeacherResponderRegistry.responder
+    if (responder == null) TeacherConversation.addTeacherMessage("AI connection is not configured yet. Your question and current screen context are ready to send once a provider is connected.")
+    else scope.launch { responder.respond(request).onSuccess(TeacherConversation::addTeacherMessage).onFailure { TeacherConversation.addTeacherMessage("I couldn't get a response. Please try again.") } }
+  })
 }
 
 @Composable
 private fun EncyclopaediaNavHost(navController: NavHostController) {
   NavHost(navController, startDestination = AppDestination.Home.route) {
-    composable(AppDestination.Home.route) {
-      HomeScreen(
-        onOpenPlanner = { navigateSingleTop(navController, AppDestination.Planner.route) },
-        onPractice = { navigateSingleTop(navController, AppDestination.Practice.route) },
-        onImport = { navigateSingleTop(navController, AppDestination.Import.route) },
-        onAddNotes = { navigateSingleTop(navController, AppDestination.Learn.route) },
-        onRevision = { navigateSingleTop(navController, AppDestination.Revision.route) }
-      )
-    }
+    composable(AppDestination.Home.route) { HomeScreen(
+      onOpenPlanner = { navigateSingleTop(navController, AppDestination.Planner.route) },
+      onPractice = { navigateSingleTop(navController, AppDestination.Practice.route) },
+      onImport = { navigateSingleTop(navController, AppDestination.Import.route) },
+      onAddNotes = { navigateSingleTop(navController, AppDestination.Learn.route) },
+      onRevision = { navigateSingleTop(navController, AppDestination.Revision.route) }
+    ) }
     composable(AppDestination.Learn.route) { KnowledgeScreen() }
     composable(AppDestination.Questions.route) { QuestionBankScreen() }
     composable(AppDestination.Practice.route) { PracticeScreen(onDone = { navigateSingleTop(navController, AppDestination.Questions.route) }) }
@@ -106,7 +78,7 @@ private fun EncyclopaediaNavHost(navController: NavHostController) {
     composable(AppDestination.Planner.route) { PlannerScreen() }
     composable(AppDestination.Pyq.route) { FeaturePlaceholderScreen("PYQ Papers", "Organize official previous-year questions by exam, year, paper and shift.") }
     composable(AppDestination.Performance.route) { PerformanceScreen() }
-    composable(AppDestination.QuestionEditor.route) { FeaturePlaceholderScreen("Question Editor", "Create and edit questions manually.") }
+    composable(AppDestination.QuestionEditor.route) { QuestionEditorScreen(onDone = { navController.popBackStack() }) }
     composable(AppDestination.Import.route) { QuestionImportScreen(onDone = { navController.popBackStack() }) }
     composable(AppDestination.Backup.route) { BackupScreen() }
     composable(AppDestination.Settings.route) { AccessibilitySettingsScreen() }
