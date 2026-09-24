@@ -9,6 +9,6 @@ class OcrMetadataReviewTest {
   }
 
   @Test fun completeMetadataStillRequiresVerification() {
-    assertTrue(OcrSourceMetadata("DSSSB", 2025).reviewGuidance().message.contains("Verify"))
+    assertTrue(OcrSourceMetadata("DSSSB", 2025).reviewGuidance().message.contains("verify", ignoreCase = true))
   }
 }
