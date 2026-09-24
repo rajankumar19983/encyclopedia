@@ -7,6 +7,10 @@ data class PerformanceSummary(
   val totalQuestions: Int,
   val averageTimeMs: Long
 ) {
-  val accuracy: Int get() = if (attempts == 0) 0 else (correct * 100 / attempts).coerceIn(0, 100)
-  val coverage: Int get() = if (totalQuestions == 0) 0 else (uniqueQuestions * 100 / totalQuestions).coerceIn(0, 100)
+  private val safeAttempts: Int get() = attempts.coerceAtLeast(0)
+  private val safeCorrect: Int get() = correct.coerceIn(0, safeAttempts)
+  private val safeTotalQuestions: Int get() = totalQuestions.coerceAtLeast(0)
+  private val safeUniqueQuestions: Int get() = uniqueQuestions.coerceIn(0, safeTotalQuestions)
+  val accuracy: Int get() = if (safeAttempts == 0) 0 else (safeCorrect * 100 / safeAttempts).coerceIn(0, 100)
+  val coverage: Int get() = if (safeTotalQuestions == 0) 0 else (safeUniqueQuestions * 100 / safeTotalQuestions).coerceIn(0, 100)
 }
