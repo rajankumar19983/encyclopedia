@@ -1,42 +1,33 @@
 package com.rajankumar.encyclopaedia.feature.knowledge
 
-import com.rajankumar.encyclopaedia.R
+import java.io.File
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
-import org.xmlpull.v1.XmlPullParser
 
-@RunWith(RobolectricTestRunner::class)
 class AiCredentialBackupRulesTest {
   private val credentialPreferenceFile = "${LocalAiApiKeyStore.PREFERENCES_NAME}.xml"
 
   @Test
   fun `modern Android backup rules exclude AI credentials`() {
-    assertTrue(credentialPreferenceFile in excludedSharedPreferences(R.xml.backup_rules))
+    val rules = readSourceXml("backup_rules.xml")
+
+    assertTrue(rules.contains("domain=\"sharedpref\" path=\"$credentialPreferenceFile\""))
   }
 
   @Test
   fun `legacy Android backup rules exclude AI credentials`() {
-    assertTrue(credentialPreferenceFile in excludedSharedPreferences(R.xml.backup_rules_legacy))
+    val rules = readSourceXml("backup_rules_legacy.xml")
+
+    assertTrue(rules.contains("domain=\"sharedpref\" path=\"$credentialPreferenceFile\""))
   }
 
-  private fun excludedSharedPreferences(resourceId: Int): Set<String> {
-    val parser = RuntimeEnvironment.getApplication().resources.getXml(resourceId)
-    val paths = mutableSetOf<String>()
-    var event = parser.eventType
-    while (event != XmlPullParser.END_DOCUMENT) {
-      if (
-        event == XmlPullParser.START_TAG &&
-        parser.name == "exclude" &&
-        parser.getAttributeValue(null, "domain") == "sharedpref"
-      ) {
-        parser.getAttributeValue(null, "path")?.let(paths::add)
-      }
-      event = parser.next()
-    }
-    parser.close()
-    return paths
+  private fun readSourceXml(fileName: String): String {
+    val candidates = listOf(
+      File("src/main/res/xml/$fileName"),
+      File("app/src/main/res/xml/$fileName"),
+    )
+    val file = candidates.firstOrNull(File::isFile)
+      ?: error("Could not locate $fileName from ${File(".").absolutePath}")
+    return file.readText()
   }
 }
