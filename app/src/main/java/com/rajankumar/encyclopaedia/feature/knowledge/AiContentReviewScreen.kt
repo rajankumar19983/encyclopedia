@@ -42,6 +42,8 @@ fun AiContentReviewScreen(
   var collapsedKeys by remember(proposal.generatedAt) { mutableStateOf(emptySet<String>()) }
   var confirmDiscard by remember { mutableStateOf(false) }
   var confirmRegenerate by remember { mutableStateOf(false) }
+  var addNodePath by remember(proposal.generatedAt) { mutableStateOf<List<Int>?>(null) }
+  var addLessonPath by remember(proposal.generatedAt) { mutableStateOf<List<Int>?>(null) }
   val rows = proposal.root.reviewRows(collapsedKeys)
   val isBusy = isSaving || isRegenerating
 
@@ -119,6 +121,8 @@ fun AiContentReviewScreen(
                 collapsedKeys + row.collapseKey
               }
             },
+            onAddNode = { addNodePath = row.path },
+            onAddLesson = { addLessonPath = row.path },
             onProposalChange = onProposalChange,
           )
           is AiReviewRow.Lesson -> LessonReviewCard(
@@ -130,6 +134,44 @@ fun AiContentReviewScreen(
         }
       }
     }
+  }
+
+  addNodePath?.let { parentPath ->
+    AddDraftNodeDialog(
+      onDismiss = { addNodePath = null },
+      onAdd = { title, description ->
+        val root = AiContentDraftEditor.addNodeAtPath(
+          proposal.root,
+          parentPath,
+          AiKnowledgeDraft(
+            title = title.trim(),
+            description = description.trim().ifBlank { null },
+          ),
+        )
+        collapsedKeys = collapsedKeys - collapseKey(parentPath)
+        addNodePath = null
+        onProposalChange(proposal.copy(root = root))
+      },
+    )
+  }
+
+  addLessonPath?.let { nodePath ->
+    AddDraftLessonDialog(
+      onDismiss = { addLessonPath = null },
+      onAdd = { title, content ->
+        val root = AiContentDraftEditor.addLessonAtPath(
+          proposal.root,
+          nodePath,
+          AiLessonDraft(
+            title = title.trim(),
+            content = content.trim(),
+          ),
+        )
+        collapsedKeys = collapsedKeys - collapseKey(nodePath)
+        addLessonPath = null
+        onProposalChange(proposal.copy(root = root))
+      },
+    )
   }
 
   if (confirmRegenerate) {
@@ -185,6 +227,8 @@ private fun NodeReviewCard(
   collapsed: Boolean,
   canCollapse: Boolean,
   onToggleCollapsed: () -> Unit,
+  onAddNode: () -> Unit,
+  onAddLesson: () -> Unit,
   onProposalChange: (AiContentProposal) -> Unit,
 ) {
   Card(
@@ -228,15 +272,19 @@ private fun NodeReviewCard(
         enabled = enabled,
         modifier = Modifier.fillMaxWidth(),
       )
-      if (row.path.isNotEmpty()) {
-        TextButton(
-          onClick = {
-            onProposalChange(
-              proposal.copy(root = AiContentDraftEditor.removeNodeAtPath(proposal.root, row.path)),
-            )
-          },
-          enabled = enabled,
-        ) { Text("Remove node") }
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TextButton(onClick = onAddNode, enabled = enabled) { Text("Add subtopic") }
+        TextButton(onClick = onAddLesson, enabled = enabled) { Text("Add lesson") }
+        if (row.path.isNotEmpty()) {
+          TextButton(
+            onClick = {
+              onProposalChange(
+                proposal.copy(root = AiContentDraftEditor.removeNodeAtPath(proposal.root, row.path)),
+              )
+            },
+            enabled = enabled,
+          ) { Text("Remove node") }
+        }
       }
     }
   }
@@ -302,3 +350,80 @@ private fun LessonReviewCard(
     }
   }
 }
+
+@Composable
+private fun AddDraftNodeDialog(
+  onDismiss: () -> Unit,
+  onAdd: (String, String) -> Unit,
+) {
+  var title by remember { mutableStateOf("") }
+  var description by remember { mutableStateOf("") }
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text("Add subtopic to draft") },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+          value = title,
+          onValueChange = { title = it },
+          label = { Text("Title") },
+          singleLine = true,
+          modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+          value = description,
+          onValueChange = { description = it },
+          label = { Text("Description (optional)") },
+          modifier = Modifier.fillMaxWidth(),
+        )
+      }
+    },
+    confirmButton = {
+      TextButton(
+        onClick = { onAdd(title, description) },
+        enabled = title.isNotBlank(),
+      ) { Text("Add subtopic") }
+    },
+    dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+  )
+}
+
+@Composable
+private fun AddDraftLessonDialog(
+  onDismiss: () -> Unit,
+  onAdd: (String, String) -> Unit,
+) {
+  var title by remember { mutableStateOf("") }
+  var content by remember { mutableStateOf("") }
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text("Add lesson to draft") },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+          value = title,
+          onValueChange = { title = it },
+          label = { Text("Lesson title") },
+          singleLine = true,
+          modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+          value = content,
+          onValueChange = { content = it },
+          label = { Text("Lesson content") },
+          minLines = 4,
+          modifier = Modifier.fillMaxWidth(),
+        )
+      }
+    },
+    confirmButton = {
+      TextButton(
+        onClick = { onAdd(title, content) },
+        enabled = title.isNotBlank() && content.isNotBlank(),
+      ) { Text("Add lesson") }
+    },
+    dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+  )
+}
+
+private fun collapseKey(path: List<Int>): String = "node:${path.joinToString(".")}"

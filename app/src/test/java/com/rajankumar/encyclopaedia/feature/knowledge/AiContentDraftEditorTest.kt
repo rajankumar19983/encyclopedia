@@ -69,6 +69,57 @@ class AiContentDraftEditorTest {
   }
 
   @Test
+  fun `nested node can receive appended child by path`() {
+    val root = AiKnowledgeDraft(
+      title = "Root",
+      children = listOf(
+        AiKnowledgeDraft(
+          title = "Module",
+          children = listOf(AiKnowledgeDraft(title = "Existing")),
+        ),
+      ),
+    )
+
+    val edited = AiContentDraftEditor.addNodeAtPath(
+      root,
+      listOf(0),
+      AiKnowledgeDraft(title = "Added"),
+    )
+
+    assertEquals(listOf("Existing", "Added"), edited.children.single().children.map { it.title })
+  }
+
+  @Test
+  fun `nested node can receive appended lesson by path`() {
+    val root = AiKnowledgeDraft(
+      title = "Root",
+      children = listOf(AiKnowledgeDraft(title = "Topic")),
+    )
+
+    val edited = AiContentDraftEditor.addLessonAtPath(
+      root,
+      listOf(0),
+      AiLessonDraft("New lesson", "New content"),
+    )
+
+    val lesson = edited.children.single().lessons.single()
+    assertEquals("New lesson", lesson.title)
+    assertEquals("New content", lesson.content)
+  }
+
+  @Test
+  fun `append operations reject invalid paths`() {
+    val root = AiKnowledgeDraft(title = "Root")
+
+    assertThrows(IllegalArgumentException::class.java) {
+      AiContentDraftEditor.addNodeAtPath(root, listOf(0), AiKnowledgeDraft(title = "Child"))
+    }
+    assertThrows(IllegalArgumentException::class.java) {
+      AiContentDraftEditor.addLessonAtPath(root, listOf(1), AiLessonDraft("Lesson", "Content"))
+    }
+  }
+
+  @Test
   fun `nested lesson can be edited and removed by path`() {
     val root = AiKnowledgeDraft(
       title = "Root",

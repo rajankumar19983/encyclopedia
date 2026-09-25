@@ -35,6 +35,22 @@ object AiContentDraftEditor {
     )
   }
 
+  fun addNodeAtPath(
+    root: AiKnowledgeDraft,
+    parentPath: List<Int>,
+    child: AiKnowledgeDraft,
+  ): AiKnowledgeDraft = updateNodeAtPath(root, parentPath) { parent ->
+    addChild(parent, child)
+  }
+
+  fun addLessonAtPath(
+    root: AiKnowledgeDraft,
+    nodePath: List<Int>,
+    lesson: AiLessonDraft,
+  ): AiKnowledgeDraft = updateNodeAtPath(root, nodePath) { node ->
+    addLesson(node, lesson)
+  }
+
   fun updateLessonAtPath(
     root: AiKnowledgeDraft,
     nodePath: List<Int>,
