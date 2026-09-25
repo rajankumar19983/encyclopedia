@@ -55,6 +55,7 @@ fun KnowledgeScreen() {
   val aiState by aiViewModel.uiState.collectAsStateWithLifecycle()
 
   var selected by remember { mutableStateOf<KnowledgeNodeEntity?>(null) }
+  var sourceFilter by remember { mutableStateOf(KnowledgeSourceFilter.ALL) }
   var addNode by remember { mutableStateOf(false) }
   var addLesson by remember { mutableStateOf(false) }
   var showAiBuilder by remember { mutableStateOf(false) }
@@ -106,6 +107,9 @@ fun KnowledgeScreen() {
       },
     )
   } else if (selected == null) {
+    val visibleRoots = filterKnowledgeNodesBySource(roots, sourceFilter)
+    val sourceSummary = summarizeKnowledgeSources(roots.map { it.source })
+
     Column(
       modifier = Modifier.fillMaxSize().padding(28.dp),
       verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -116,9 +120,18 @@ fun KnowledgeScreen() {
         onAdd = { addNode = true },
         onAi = { showAiBuilder = true },
       )
-      if (roots.isEmpty()) Text("No subjects yet. Add your first subject or generate a reviewed AI draft.")
+      KnowledgeSourceFilterBar(sourceFilter, sourceSummary) { sourceFilter = it }
+      if (visibleRoots.isEmpty()) {
+        Text(
+          if (roots.isEmpty()) {
+            "No subjects yet. Add your first subject or generate a reviewed AI draft."
+          } else {
+            sourceFilter.emptyMessage("subjects")
+          },
+        )
+      }
       LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        items(roots, key = { it.id }) { node ->
+        items(visibleRoots, key = { it.id }) { node ->
           NodeCard(node) { selected = node }
         }
       }
@@ -127,6 +140,11 @@ fun KnowledgeScreen() {
     val node = selected!!
     val children by dao.observeChildren(node.id).collectAsStateWithLifecycle(emptyList())
     val lessons by dao.observeLessons(node.id).collectAsStateWithLifecycle(emptyList())
+    val visibleChildren = filterKnowledgeNodesBySource(children, sourceFilter)
+    val visibleLessons = filterLessonsBySource(lessons, sourceFilter)
+    val sourceSummary = summarizeKnowledgeSources(
+      children.map { it.source } + lessons.map { it.source },
+    )
 
     Column(
       modifier = Modifier.fillMaxSize().padding(28.dp),
@@ -138,7 +156,10 @@ fun KnowledgeScreen() {
             Icon(Icons.Default.ArrowBack, "Back")
           }
           Column {
-            Text(node.name, style = MaterialTheme.typography.headlineMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+              Text(node.name, style = MaterialTheme.typography.headlineMedium)
+              KnowledgeSourceBadge(node.source)
+            }
             Text(
               "${children.size} subtopics • ${lessons.size} lessons",
               color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -152,14 +173,16 @@ fun KnowledgeScreen() {
         }
       }
 
+      KnowledgeSourceFilterBar(sourceFilter, sourceSummary) { sourceFilter = it }
+
       LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        if (children.isNotEmpty()) {
+        if (visibleChildren.isNotEmpty()) {
           item { Text("Subtopics", style = MaterialTheme.typography.titleLarge) }
         }
-        items(children, key = { it.id }) { child ->
+        items(visibleChildren, key = { it.id }) { child ->
           NodeCard(child) { selected = child }
         }
-        if (lessons.isNotEmpty()) {
+        if (visibleLessons.isNotEmpty()) {
           item {
             Text(
               "Lessons",
@@ -168,11 +191,14 @@ fun KnowledgeScreen() {
             )
           }
         }
-        items(lessons, key = { it.id }) { lesson ->
+        items(visibleLessons, key = { it.id }) { lesson ->
           Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
               Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(lesson.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Column(Modifier.weight(1f)) {
+                  Text(lesson.title, style = MaterialTheme.typography.titleMedium)
+                  KnowledgeSourceBadge(lesson.source)
+                }
                 Row {
                   IconButton(
                     onClick = {
@@ -189,6 +215,9 @@ fun KnowledgeScreen() {
               Text(lesson.content, maxLines = 5, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
           }
+        }
+        if ((children.isNotEmpty() || lessons.isNotEmpty()) && visibleChildren.isEmpty() && visibleLessons.isEmpty()) {
+          item { Text(sourceFilter.emptyMessage("subtopics or lessons")) }
         }
       }
     }
@@ -273,6 +302,35 @@ fun KnowledgeScreen() {
 }
 
 @Composable
+private fun KnowledgeSourceFilterBar(
+  selectedFilter: KnowledgeSourceFilter,
+  summary: KnowledgeSourceSummary,
+  onFilterChange: (KnowledgeSourceFilter) -> Unit,
+) {
+  Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    KnowledgeSourceFilter.entries.forEach { filter ->
+      val label = "${filter.label} (${summary.countFor(filter)})"
+      if (filter == selectedFilter) {
+        Button(onClick = { onFilterChange(filter) }) { Text(label) }
+      } else {
+        TextButton(onClick = { onFilterChange(filter) }) { Text(label) }
+      }
+    }
+  }
+}
+
+@Composable
+private fun KnowledgeSourceBadge(source: String) {
+  knowledgeSourceBadge(source)?.let { label ->
+    Text(
+      label,
+      style = MaterialTheme.typography.labelSmall,
+      color = MaterialTheme.colorScheme.primary,
+    )
+  }
+}
+
+@Composable
 private fun Header(
   title: String,
   subtitle: String,
@@ -297,8 +355,11 @@ private fun Header(
 @Composable
 private fun NodeCard(node: KnowledgeNodeEntity, onClick: () -> Unit) {
   Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
-    Column(Modifier.padding(18.dp)) {
-      Text(node.name, style = MaterialTheme.typography.titleMedium)
+    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(node.name, style = MaterialTheme.typography.titleMedium)
+        KnowledgeSourceBadge(node.source)
+      }
       node.description?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
   }
