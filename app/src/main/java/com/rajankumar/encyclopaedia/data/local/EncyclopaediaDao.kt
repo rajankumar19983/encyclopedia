@@ -28,11 +28,14 @@ interface EncyclopaediaDao {
   @Query("SELECT * FROM questions ORDER BY createdAt DESC") fun observeQuestions(): Flow<List<QuestionEntity>>
   @Query("SELECT COUNT(*) FROM questions") fun observeQuestionCount(): Flow<Int>
   @Query("SELECT * FROM questions") suspend fun getAllQuestionsOnce(): List<QuestionEntity>
+  @Query("SELECT * FROM questions WHERE id NOT IN (SELECT DISTINCT questionId FROM question_attempts)") suspend fun getAllUnattemptedQuestionsForPractice(): List<QuestionEntity>
+  @Query("SELECT * FROM questions WHERE id IN (SELECT DISTINCT questionId FROM question_attempts WHERE isCorrect = 0)") suspend fun getAllPreviouslyIncorrectQuestionsForPractice(): List<QuestionEntity>
   @Query("SELECT * FROM questions ORDER BY RANDOM() LIMIT :limit") suspend fun getRandomQuestions(limit: Int): List<QuestionEntity>
   @Query("SELECT * FROM questions WHERE id IN (:ids)") suspend fun getQuestionsByIds(ids: List<String>): List<QuestionEntity>
   @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertQuestion(question: QuestionEntity)
   @Query("DELETE FROM questions WHERE id = :id") suspend fun deleteQuestion(id: String)
   @Query("SELECT * FROM question_topics ORDER BY questionId, knowledgeNodeId") fun observeQuestionTopics(): Flow<List<QuestionTopicEntity>>
+  @Query("SELECT * FROM question_topics ORDER BY questionId, knowledgeNodeId") suspend fun getAllQuestionTopicsOnce(): List<QuestionTopicEntity>
   @Query("SELECT * FROM question_topics ORDER BY questionId, knowledgeNodeId") suspend fun getAllQuestionTopicsForBackup(): List<QuestionTopicEntity>
   @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertQuestionTopic(link: QuestionTopicEntity)
   @Query("DELETE FROM question_topics WHERE questionId = :questionId") suspend fun clearQuestionTopics(questionId: String)

@@ -3,15 +3,21 @@ package com.rajankumar.encyclopaedia.feature.questions
 import com.rajankumar.encyclopaedia.data.local.EncyclopaediaDao
 import com.rajankumar.encyclopaedia.data.local.QuestionEntity
 
-suspend fun EncyclopaediaDao.loadPracticeQuestions(mode: PracticeMode, limit: Int): List<QuestionEntity> {
-  val requested = limit.coerceIn(1, PracticeConstants.maxSessionQuestions)
-  val candidates = when (mode) {
-    PracticeMode.RANDOM -> getRandomQuestions(PracticeConstants.maxSessionQuestions)
-    PracticeMode.NEW -> getUnattemptedQuestions(PracticeConstants.maxSessionQuestions)
-    PracticeMode.MISTAKES -> getPreviouslyIncorrectQuestions(PracticeConstants.maxSessionQuestions)
+suspend fun EncyclopaediaDao.loadPracticeQuestions(config: PracticeSessionConfig): List<QuestionEntity> {
+  val candidates = when (config.mode) {
+    PracticeMode.RANDOM -> getAllQuestionsOnce()
+    PracticeMode.NEW -> getAllUnattemptedQuestionsForPractice()
+    PracticeMode.MISTAKES -> getAllPreviouslyIncorrectQuestionsForPractice()
   }
-  return candidates.filter { it.validateForPractice().valid }.take(requested)
+  val questionTopics = if (config.topicId.isNullOrBlank()) emptyList() else getAllQuestionTopicsOnce()
+
+  return filterPracticeCandidates(candidates, questionTopics, config)
+    .shuffled()
+    .take(config.safeQuestionCount)
 }
+
+suspend fun EncyclopaediaDao.loadPracticeQuestions(mode: PracticeMode, limit: Int): List<QuestionEntity> =
+  loadPracticeQuestions(PracticeSessionConfig(mode = mode, questionCount = limit))
 
 suspend fun EncyclopaediaDao.loadRevisionPracticeQuestions(questionIds: List<String>): List<QuestionEntity> {
   if (questionIds.isEmpty()) return emptyList()

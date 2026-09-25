@@ -5,3 +5,9 @@ fun PracticeMode.emptyMessage(): String = when (this) {
   PracticeMode.NEW -> "You have attempted every practice-ready question. Try Random or Mistakes."
   PracticeMode.MISTAKES -> "No previous mistakes are available to review."
 }
+
+fun PracticeSessionConfig.emptyMessage(): String = if (hasFilters) {
+  "No practice-ready questions match this mode and the selected filters. Adjust the filters or choose another mode."
+} else {
+  mode.emptyMessage()
+}

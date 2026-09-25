@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -45,8 +44,15 @@ fun QuestionBankScreen() {
   var importing by remember { mutableStateOf(false) }
   var practising by remember { mutableStateOf(false) }
   var generatingAi by remember { mutableStateOf(false) }
+  var practicePreset by remember { mutableStateOf(QuestionBankFilterState()) }
   if (importing) { QuestionImportScreen(onDone = { importing = false }); return }
-  if (practising) { PracticeScreen(onDone = { practising = false }); return }
+  if (practising) {
+    PracticeScreen(
+      onDone = { practising = false },
+      initialFilters = practicePreset,
+    )
+    return
+  }
   if (generatingAi) { AiQuestionFlowScreen(onDone = { generatingAi = false }); return }
 
   val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
@@ -61,7 +67,7 @@ fun QuestionBankScreen() {
   val visibleQuestions = remember(questions, questionTopics, filters) {
     questions.applyQuestionBankFilters(filters, questionTopics)
   }
-  val readiness = remember(questions) { questions.practiceReadiness() }
+  val visibleReadiness = remember(visibleQuestions) { visibleQuestions.practiceReadiness() }
   val sourceOptions = remember(questions) { availableQuestionSources(questions) }
   val topicNamesById = remember(topics) { topics.associate { it.id to it.name } }
   val topicIdByQuestionId = remember(questionTopics) {
@@ -73,12 +79,18 @@ fun QuestionBankScreen() {
       Column {
         Text("Question Bank", style = MaterialTheme.typography.headlineMedium)
         Text(
-          "${visibleQuestions.size} shown • ${questions.size} total • ${readiness.ready} practice-ready",
+          "${visibleQuestions.size} shown • ${questions.size} total • ${visibleReadiness.ready} shown practice-ready",
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = { practising = true }, enabled = readiness.ready > 0) { Text("Practice") }
+        Button(
+          onClick = {
+            practicePreset = filters
+            practising = true
+          },
+          enabled = visibleReadiness.ready > 0,
+        ) { Text("Practice") }
         Button(onClick = { generatingAi = true }) { Text("AI Generate") }
         Button(onClick = { importing = true }) { Text("Scan / PDF") }
         Button(onClick = { editing = null; showEditor = true }) { Icon(Icons.Default.Add, null); Text(" Add Question") }
@@ -93,20 +105,20 @@ fun QuestionBankScreen() {
       singleLine = true,
     )
 
-    QuestionFilterRow(
+    QuestionFilterChoiceRow(
       title = "Source",
       choices = listOf(null to "All") + sourceOptions.map { source -> source to displayQuestionSource(source) },
       selected = filters.source,
       onSelect = { filters = filters.copy(source = it) },
     )
-    QuestionFilterRow(
+    QuestionFilterChoiceRow(
       title = "Difficulty",
       choices = listOf(null to "All") + questionDifficultyOptions.map { value -> value to value.lowercase().replaceFirstChar(Char::uppercase) },
       selected = filters.difficulty,
       onSelect = { filters = filters.copy(difficulty = it) },
     )
     if (topics.isNotEmpty()) {
-      QuestionFilterRow(
+      QuestionFilterChoiceRow(
         title = "Knowledge topic",
         choices = listOf(null to "All") + topics.map { topic -> topic.id to topic.name },
         selected = filters.topicId,
@@ -187,25 +199,6 @@ fun QuestionBankScreen() {
         editing = null
       },
     )
-  }
-}
-
-@Composable
-private fun QuestionFilterRow(
-  title: String,
-  choices: List<Pair<String?, String>>,
-  selected: String?,
-  onSelect: (String?) -> Unit,
-) {
-  Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-    Text(title, style = MaterialTheme.typography.titleSmall)
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-      items(choices, key = { choice -> "$title:${choice.first ?: "ALL"}" }) { (value, label) ->
-        TextButton(onClick = { onSelect(value) }) {
-          Text(if (selected == value) "✓ $label" else label)
-        }
-      }
-    }
   }
 }
 
