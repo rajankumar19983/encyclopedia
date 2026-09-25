@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+  <!-- Android 11 and earlier use fullBackupContent instead of dataExtractionRules. -->
+  <exclude domain="sharedpref" path="local_ai_credentials.xml" />
+  <exclude domain="sharedpref" path="openai_secure_credentials.xml" />
+  <exclude domain="sharedpref" path="backup_storage.xml" />
+</full-backup-content>

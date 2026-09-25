@@ -6,6 +6,8 @@ data class AiGenerationUiState(
   val includeLessons: Boolean = true,
   val isGenerating: Boolean = false,
   val proposal: AiContentProposal? = null,
+  val destinationNodeId: String? = null,
+  val destinationLabel: String? = null,
   val errorMessage: String? = null,
 ) {
   val canGenerate: Boolean

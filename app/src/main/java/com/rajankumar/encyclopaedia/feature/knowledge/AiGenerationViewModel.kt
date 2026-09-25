@@ -26,7 +26,10 @@ class AiGenerationViewModel(
     _uiState.update { it.copy(includeLessons = include, errorMessage = null) }
   }
 
-  fun generate(parentNodeId: String? = null) {
+  fun generate(
+    parentNodeId: String? = null,
+    destinationLabel: String? = null,
+  ) {
     val state = _uiState.value
     if (!state.canGenerate) return
 
@@ -36,8 +39,17 @@ class AiGenerationViewModel(
       depth = state.depth,
       includeLessons = state.includeLessons,
     )
+    val normalizedDestinationLabel = destinationLabel?.trim()?.takeIf(String::isNotEmpty)
 
-    _uiState.update { it.copy(isGenerating = true, proposal = null, errorMessage = null) }
+    _uiState.update {
+      it.copy(
+        isGenerating = true,
+        proposal = null,
+        destinationNodeId = parentNodeId,
+        destinationLabel = normalizedDestinationLabel,
+        errorMessage = null,
+      )
+    }
     viewModelScope.launch {
       val prompt = AiContentPromptBuilder.build(request)
       when (val result = generator.generate(prompt)) {
@@ -59,7 +71,13 @@ class AiGenerationViewModel(
   }
 
   fun clearProposal() {
-    _uiState.update { it.copy(proposal = null) }
+    _uiState.update {
+      it.copy(
+        proposal = null,
+        destinationNodeId = null,
+        destinationLabel = null,
+      )
+    }
   }
 
   fun clearError() {

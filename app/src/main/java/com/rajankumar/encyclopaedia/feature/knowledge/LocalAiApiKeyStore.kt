@@ -5,8 +5,8 @@ import android.content.Context
 /**
  * Device-local storage for a user-owned AI API key.
  *
- * The key is deliberately kept out of Room, backups and source code. Android's
- * private app sandbox protects this preference from other normal applications.
+ * The key is deliberately kept out of Room, Android backups and source code.
+ * Android's private app sandbox protects this preference from other normal applications.
  */
 class LocalAiApiKeyStore(context: Context) : AiApiKeySource {
   private val preferences = context.applicationContext.getSharedPreferences(
@@ -30,8 +30,8 @@ class LocalAiApiKeyStore(context: Context) : AiApiKeySource {
     preferences.edit().remove(KEY_API_KEY).apply()
   }
 
-  private companion object {
-    const val PREFERENCES_NAME = "local_ai_credentials"
-    const val KEY_API_KEY = "openai_api_key"
+  companion object {
+    internal const val PREFERENCES_NAME = "local_ai_credentials"
+    private const val KEY_API_KEY = "openai_api_key"
   }
 }

@@ -1,5 +1,6 @@
 package com.rajankumar.encyclopaedia.feature.knowledge
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -30,5 +31,16 @@ class AiGenerationUiStateTest {
       root = AiKnowledgeDraft(title = "Database systems"),
     )
     assertTrue(AiGenerationUiState(proposal = proposal).hasProposal)
+  }
+
+  @Test
+  fun `review state can retain its generation destination`() {
+    val state = AiGenerationUiState(
+      destinationNodeId = "node-42",
+      destinationLabel = "Operating systems",
+    )
+
+    assertEquals("node-42", state.destinationNodeId)
+    assertEquals("Operating systems", state.destinationLabel)
   }
 }

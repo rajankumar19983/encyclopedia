@@ -75,11 +75,13 @@ fun AiContentReviewScreen(
           is AiReviewRow.Node -> NodeReviewCard(
             row = row,
             proposal = proposal,
+            enabled = !isSaving,
             onProposalChange = onProposalChange,
           )
           is AiReviewRow.Lesson -> LessonReviewCard(
             row = row,
             proposal = proposal,
+            enabled = !isSaving,
             onProposalChange = onProposalChange,
           )
         }
@@ -92,6 +94,7 @@ fun AiContentReviewScreen(
 private fun NodeReviewCard(
   row: AiReviewRow.Node,
   proposal: AiContentProposal,
+  enabled: Boolean,
   onProposalChange: (AiContentProposal) -> Unit,
 ) {
   Card(
@@ -113,6 +116,7 @@ private fun NodeReviewCard(
           onProposalChange(proposal.copy(root = root))
         },
         label = { Text("Title") },
+        enabled = enabled,
         modifier = Modifier.fillMaxWidth(),
       )
       OutlinedTextField(
@@ -124,6 +128,7 @@ private fun NodeReviewCard(
           onProposalChange(proposal.copy(root = root))
         },
         label = { Text("Description") },
+        enabled = enabled,
         modifier = Modifier.fillMaxWidth(),
       )
       if (row.path.isNotEmpty()) {
@@ -133,6 +138,7 @@ private fun NodeReviewCard(
               proposal.copy(root = AiContentDraftEditor.removeNodeAtPath(proposal.root, row.path)),
             )
           },
+          enabled = enabled,
         ) { Text("Remove node") }
       }
     }
@@ -143,6 +149,7 @@ private fun NodeReviewCard(
 private fun LessonReviewCard(
   row: AiReviewRow.Lesson,
   proposal: AiContentProposal,
+  enabled: Boolean,
   onProposalChange: (AiContentProposal) -> Unit,
 ) {
   Card(
@@ -163,6 +170,7 @@ private fun LessonReviewCard(
           onProposalChange(proposal.copy(root = root))
         },
         label = { Text("Lesson title") },
+        enabled = enabled,
         modifier = Modifier.fillMaxWidth(),
       )
       OutlinedTextField(
@@ -176,6 +184,7 @@ private fun LessonReviewCard(
           onProposalChange(proposal.copy(root = root))
         },
         label = { Text("Lesson content") },
+        enabled = enabled,
         minLines = 3,
         modifier = Modifier.fillMaxWidth(),
       )
@@ -191,6 +200,7 @@ private fun LessonReviewCard(
             ),
           )
         },
+        enabled = enabled,
       ) { Text("Remove lesson") }
     }
   }

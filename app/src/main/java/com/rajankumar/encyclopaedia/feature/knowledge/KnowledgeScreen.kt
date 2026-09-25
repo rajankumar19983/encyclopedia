@@ -67,17 +67,21 @@ fun KnowledgeScreen() {
   if (proposal != null) {
     AiContentReviewScreen(
       proposal = proposal,
-      destinationLabel = selected?.name,
+      destinationLabel = aiState.destinationLabel,
       isSaving = isApprovingAi,
       saveError = approvalError,
-      onProposalChange = aiViewModel::updateProposal,
+      onProposalChange = { updatedProposal ->
+        approvalError = null
+        aiViewModel.updateProposal(updatedProposal)
+      },
       onApprove = {
         if (!isApprovingAi) {
           isApprovingAi = true
           approvalError = null
+          val destinationNodeId = aiState.destinationNodeId
           scope.launch {
             try {
-              AiContentApprovalService(dao).approve(proposal, selected?.id)
+              AiContentApprovalService(dao).approve(proposal, destinationNodeId)
               aiViewModel.clearProposal()
               aiViewModel.setTopic("")
               showAiBuilder = false
@@ -231,7 +235,10 @@ fun KnowledgeScreen() {
       onTopicChange = aiViewModel::setTopic,
       onDepthChange = aiViewModel::setDepth,
       onIncludeLessonsChange = aiViewModel::setIncludeLessons,
-      onGenerate = { aiViewModel.generate(selected?.id) },
+      onGenerate = {
+        approvalError = null
+        aiViewModel.generate(selected?.id, selected?.name)
+      },
       onManageApiKey = { showApiKeyDialog = true },
       onDismiss = {
         showAiBuilder = false
