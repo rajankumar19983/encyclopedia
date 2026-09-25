@@ -1,5 +1,6 @@
 package com.rajankumar.encyclopaedia.feature.knowledge
 
+import com.rajankumar.encyclopaedia.data.local.KnowledgeContentSource
 import com.rajankumar.encyclopaedia.data.local.KnowledgeNodeEntity
 import com.rajankumar.encyclopaedia.data.local.LessonEntity
 import java.util.UUID
@@ -27,6 +28,7 @@ object AiContentEntityMapper {
         name = draft.title.trim(),
         description = draft.description?.trim()?.ifBlank { null },
         sortOrder = sortOrder,
+        source = KnowledgeContentSource.AI,
         createdAt = now,
         updatedAt = now
       )
@@ -37,6 +39,7 @@ object AiContentEntityMapper {
           title = lesson.title.trim(),
           content = lesson.content.trim(),
           sortOrder = index,
+          source = KnowledgeContentSource.AI,
           createdAt = now,
           updatedAt = now
         )

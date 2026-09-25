@@ -1,12 +1,13 @@
 package com.rajankumar.encyclopaedia.feature.knowledge
 
+import com.rajankumar.encyclopaedia.data.local.KnowledgeContentSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AiContentEntityMapperTest {
   @Test
-  fun preservesHierarchyLessonOwnershipAndParentAttachment() {
+  fun preservesHierarchyLessonOwnershipParentAttachmentAndAiProvenance() {
     var id = 0
     val proposal = AiContentProposal(
       AiKnowledgeDraft(
@@ -34,6 +35,8 @@ class AiContentEntityMapperTest {
     assertEquals(2, batch.lessons.size)
     assertEquals(batch.nodes[0].id, batch.lessons[0].knowledgeNodeId)
     assertEquals(batch.nodes[1].id, batch.lessons[1].knowledgeNodeId)
+    assertTrue(batch.nodes.all { it.source == KnowledgeContentSource.AI })
+    assertTrue(batch.lessons.all { it.source == KnowledgeContentSource.AI })
     assertTrue(batch.nodes.all { it.createdAt == 100L && it.updatedAt == 100L })
   }
 }

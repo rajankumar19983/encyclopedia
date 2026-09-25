@@ -7,4 +7,5 @@ val migrationManifest = listOf(
   MigrationRelease(2, "Question topics and attempt history"),
   MigrationRelease(3, "Daily study planner"),
   MigrationRelease(4, "Notebook pages, layers and vector strokes"),
+  MigrationRelease(5, "Knowledge and lesson provenance"),
 )

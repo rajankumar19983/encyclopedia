@@ -5,5 +5,6 @@ object DatabaseVersions {
   const val PRACTICE = 2
   const val PLANNER = 3
   const val NOTEBOOK = 4
-  const val CURRENT = NOTEBOOK
+  const val KNOWLEDGE_PROVENANCE = 5
+  const val CURRENT = KNOWLEDGE_PROVENANCE
 }
