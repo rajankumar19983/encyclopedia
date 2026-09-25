@@ -3,6 +3,7 @@ package com.rajankumar.encyclopaedia.feature.questions
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.rajankumar.encyclopaedia.data.local.EncyclopaediaDatabase
 import com.rajankumar.encyclopaedia.feature.knowledge.LocalAiApiKeyStore
 import com.rajankumar.encyclopaedia.feature.knowledge.OpenAiProvider
 
@@ -15,6 +16,10 @@ class AiQuestionViewModelFactory(context: Context) : ViewModelProvider.Factory {
       "Unsupported ViewModel: ${modelClass.name}"
     }
     val keyStore = LocalAiApiKeyStore(applicationContext)
-    return AiQuestionViewModel(AiQuestionGenerator(OpenAiProvider(keyStore))) as T
+    val dao = EncyclopaediaDatabase.get(applicationContext).dao()
+    return AiQuestionViewModel(
+      generator = AiQuestionGenerator(OpenAiProvider(keyStore)),
+      referenceSource = RoomAiQuestionReferenceSource(dao),
+    ) as T
   }
 }

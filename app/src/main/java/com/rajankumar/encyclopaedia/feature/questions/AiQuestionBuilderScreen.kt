@@ -69,11 +69,16 @@ fun AiQuestionBuilderScreen(
       }
     }
 
-    Text("Save approved questions under a knowledge topic (optional)", style = MaterialTheme.typography.titleMedium)
+    Text("Ground with a Knowledge topic and save approved questions there (optional)", style = MaterialTheme.typography.titleMedium)
+    Text(
+      "When selected, its current lessons and direct subtopics are used as bounded reference material for generation and regeneration.",
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      style = MaterialTheme.typography.bodySmall,
+    )
     LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
       item {
         TextButton(onClick = { onTargetTopicChange(null) }) {
-          Text(if (targetTopicId == null) "✓ No topic link" else "No topic link")
+          Text(if (targetTopicId == null) "✓ No Knowledge grounding" else "No Knowledge grounding")
         }
       }
       items(topics.take(40), key = { it.id }) { topic ->

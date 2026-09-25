@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 
 class AiQuestionViewModel(
   private val generator: AiQuestionGenerator,
+  private val referenceSource: AiQuestionReferenceSource = EmptyAiQuestionReferenceSource,
 ) : ViewModel() {
   private val _uiState = MutableStateFlow(AiQuestionUiState())
   val uiState: StateFlow<AiQuestionUiState> = _uiState.asStateFlow()
@@ -49,20 +50,33 @@ class AiQuestionViewModel(
         destinationLabel = destinationLabel,
       )
     }
-    launchGeneration(AiQuestionRequest(state.topic.trim(), state.count, state.difficulty))
+    launchGeneration(
+      request = AiQuestionRequest(state.topic.trim(), state.count, state.difficulty),
+      destinationTopicId = destinationTopicId,
+    )
   }
 
   fun regenerate() {
     val state = _uiState.value
     if (state.topic.isBlank() || state.isGenerating) return
     _uiState.update { it.copy(isGenerating = true, errorMessage = null) }
-    launchGeneration(AiQuestionRequest(state.topic.trim(), state.count, state.difficulty))
+    launchGeneration(
+      request = AiQuestionRequest(state.topic.trim(), state.count, state.difficulty),
+      destinationTopicId = state.destinationTopicId,
+    )
   }
 
-  private fun launchGeneration(request: AiQuestionRequest) {
+  private fun launchGeneration(
+    request: AiQuestionRequest,
+    destinationTopicId: String?,
+  ) {
     val existingProposal = _uiState.value.proposal
     viewModelScope.launch {
-      when (val result = generator.generate(request)) {
+      val referenceContext = destinationTopicId
+        ?.let { nodeId -> runCatching { referenceSource.load(nodeId) }.getOrNull() }
+      val groundedRequest = request.copy(referenceContext = referenceContext)
+
+      when (val result = generator.generate(groundedRequest)) {
         is AiQuestionGenerationResult.Success -> _uiState.update {
           it.copy(isGenerating = false, proposal = result.proposal, errorMessage = null)
         }
