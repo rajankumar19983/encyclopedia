@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rajankumar.encyclopaedia.data.local.EncyclopaediaDatabase
 import com.rajankumar.encyclopaedia.data.local.KnowledgeNodeEntity
 import com.rajankumar.encyclopaedia.data.local.LessonEntity
@@ -43,23 +44,69 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun KnowledgeScreen() {
-  val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
+  val context = LocalContext.current
+  val dao = EncyclopaediaDatabase.get(context).dao()
   val roots by dao.observeRootNodes().collectAsStateWithLifecycle(emptyList())
   val scope = rememberCoroutineScope()
   val speech = rememberTextToSpeechController()
+  val keyStore = remember(context) { LocalAiApiKeyStore(context) }
+  val aiFactory = remember(context) { AiGenerationViewModelFactory(context) }
+  val aiViewModel: AiGenerationViewModel = viewModel(factory = aiFactory)
+  val aiState by aiViewModel.uiState.collectAsStateWithLifecycle()
+
   var selected by remember { mutableStateOf<KnowledgeNodeEntity?>(null) }
   var addNode by remember { mutableStateOf(false) }
   var addLesson by remember { mutableStateOf(false) }
+  var showAiBuilder by remember { mutableStateOf(false) }
+  var showApiKeyDialog by remember { mutableStateOf(false) }
+  var hasApiKey by remember { mutableStateOf(keyStore.hasApiKey()) }
+  var isApprovingAi by remember { mutableStateOf(false) }
+  var approvalError by remember { mutableStateOf<String?>(null) }
 
-  if (selected == null) {
+  val proposal = aiState.proposal
+  if (proposal != null) {
+    AiContentReviewScreen(
+      proposal = proposal,
+      destinationLabel = selected?.name,
+      isSaving = isApprovingAi,
+      saveError = approvalError,
+      onProposalChange = aiViewModel::updateProposal,
+      onApprove = {
+        if (!isApprovingAi) {
+          isApprovingAi = true
+          approvalError = null
+          scope.launch {
+            try {
+              AiContentApprovalService(dao).approve(proposal, selected?.id)
+              aiViewModel.clearProposal()
+              aiViewModel.setTopic("")
+              showAiBuilder = false
+            } catch (error: Exception) {
+              approvalError = error.message ?: "Could not save the approved AI content."
+            } finally {
+              isApprovingAi = false
+            }
+          }
+        }
+      },
+      onDiscard = {
+        aiViewModel.clearProposal()
+        approvalError = null
+        showAiBuilder = false
+      },
+    )
+  } else if (selected == null) {
     Column(
       modifier = Modifier.fillMaxSize().padding(28.dp),
-      verticalArrangement = Arrangement.spacedBy(16.dp)
+      verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-      Header("Knowledge & Lessons", "Build subjects, topics, subtopics and permanent lessons.") {
-        addNode = true
-      }
-      if (roots.isEmpty()) Text("No subjects yet. Add your first subject to begin.")
+      Header(
+        title = "Knowledge & Lessons",
+        subtitle = "Build subjects, topics, subtopics and permanent lessons.",
+        onAdd = { addNode = true },
+        onAi = { showAiBuilder = true },
+      )
+      if (roots.isEmpty()) Text("No subjects yet. Add your first subject or generate a reviewed AI draft.")
       LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         items(roots, key = { it.id }) { node ->
           NodeCard(node) { selected = node }
@@ -73,7 +120,7 @@ fun KnowledgeScreen() {
 
     Column(
       modifier = Modifier.fillMaxSize().padding(28.dp),
-      verticalArrangement = Arrangement.spacedBy(16.dp)
+      verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Row {
@@ -84,11 +131,12 @@ fun KnowledgeScreen() {
             Text(node.name, style = MaterialTheme.typography.headlineMedium)
             Text(
               "${children.size} subtopics • ${lessons.size} lessons",
-              color = MaterialTheme.colorScheme.onSurfaceVariant
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
           }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          Button(onClick = { showAiBuilder = true }) { Text("AI Builder") }
           Button(onClick = { addNode = true }) { Text("Add Subtopic") }
           Button(onClick = { addLesson = true }) { Text("Add Lesson") }
         }
@@ -106,7 +154,7 @@ fun KnowledgeScreen() {
             Text(
               "Lessons",
               style = MaterialTheme.typography.titleLarge,
-              modifier = Modifier.padding(top = 10.dp)
+              modifier = Modifier.padding(top = 10.dp),
             )
           }
         }
@@ -119,7 +167,7 @@ fun KnowledgeScreen() {
                   IconButton(
                     onClick = {
                       speech.speak(SpeakableContent(title = lesson.title, body = lesson.content))
-                    }
+                    },
                   ) {
                     Icon(Icons.Default.VolumeUp, "Read lesson aloud")
                   }
@@ -136,7 +184,7 @@ fun KnowledgeScreen() {
     }
   }
 
-  if (addNode) {
+  if (addNode && proposal == null) {
     NodeDialog(
       title = if (selected == null) "Add subject" else "Add subtopic",
       dismiss = { addNode = false },
@@ -147,16 +195,16 @@ fun KnowledgeScreen() {
               id = UUID.randomUUID().toString(),
               parentId = selected?.id,
               name = name.trim(),
-              description = desc.trim().ifBlank { null }
-            )
+              description = desc.trim().ifBlank { null },
+            ),
           )
         }
         addNode = false
-      }
+      },
     )
   }
 
-  if (addLesson && selected != null) {
+  if (addLesson && selected != null && proposal == null) {
     LessonDialog(
       dismiss = { addLesson = false },
       save = { title: String, content: String ->
@@ -166,26 +214,69 @@ fun KnowledgeScreen() {
               id = UUID.randomUUID().toString(),
               knowledgeNodeId = selected!!.id,
               title = title.trim(),
-              content = content.trim()
-            )
+              content = content.trim(),
+            ),
           )
         }
         addLesson = false
-      }
+      },
+    )
+  }
+
+  if (showAiBuilder && proposal == null) {
+    AiContentBuilderDialog(
+      state = aiState,
+      hasApiKey = hasApiKey,
+      destinationLabel = selected?.name,
+      onTopicChange = aiViewModel::setTopic,
+      onDepthChange = aiViewModel::setDepth,
+      onIncludeLessonsChange = aiViewModel::setIncludeLessons,
+      onGenerate = { aiViewModel.generate(selected?.id) },
+      onManageApiKey = { showApiKeyDialog = true },
+      onDismiss = {
+        showAiBuilder = false
+        aiViewModel.clearError()
+      },
+    )
+  }
+
+  if (showApiKeyDialog && proposal == null) {
+    AiApiKeyDialog(
+      hasSavedKey = hasApiKey,
+      onSave = { apiKey ->
+        keyStore.saveApiKey(apiKey)
+        hasApiKey = keyStore.hasApiKey()
+        showApiKeyDialog = false
+        aiViewModel.clearError()
+      },
+      onClear = {
+        keyStore.clearApiKey()
+        hasApiKey = false
+        showApiKeyDialog = false
+      },
+      onDismiss = { showApiKeyDialog = false },
     )
   }
 }
 
 @Composable
-private fun Header(title: String, subtitle: String, onAdd: () -> Unit) {
+private fun Header(
+  title: String,
+  subtitle: String,
+  onAdd: () -> Unit,
+  onAi: () -> Unit,
+) {
   Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
     Column {
       Text(title, style = MaterialTheme.typography.headlineMedium)
       Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    Button(onClick = onAdd) {
-      Icon(Icons.Default.Add, null)
-      Text(" Add Subject")
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      Button(onClick = onAi) { Text("AI Builder") }
+      Button(onClick = onAdd) {
+        Icon(Icons.Default.Add, null)
+        Text(" Add Subject")
+      }
     }
   }
 }
@@ -216,7 +307,7 @@ private fun NodeDialog(title: String, dismiss: () -> Unit, save: (String, String
     confirmButton = {
       TextButton(onClick = { save(name, desc) }, enabled = name.isNotBlank()) { Text("Save") }
     },
-    dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } }
+    dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
   )
 }
 
@@ -234,16 +325,16 @@ private fun LessonDialog(dismiss: () -> Unit, save: (String, String) -> Unit) {
           value = content,
           onValueChange = { content = it },
           label = { Text("Lesson content") },
-          minLines = 6
+          minLines = 6,
         )
       }
     },
     confirmButton = {
       TextButton(
         onClick = { save(title, content) },
-        enabled = title.isNotBlank() && content.isNotBlank()
+        enabled = title.isNotBlank() && content.isNotBlank(),
       ) { Text("Save") }
     },
-    dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } }
+    dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
   )
 }
