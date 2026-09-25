@@ -43,8 +43,10 @@ import kotlinx.coroutines.launch
 fun QuestionBankScreen() {
   var importing by remember { mutableStateOf(false) }
   var practising by remember { mutableStateOf(false) }
+  var generatingAi by remember { mutableStateOf(false) }
   if (importing) { QuestionImportScreen(onDone = { importing = false }); return }
   if (practising) { PracticeScreen(onDone = { practising = false }); return }
+  if (generatingAi) { AiQuestionFlowScreen(onDone = { generatingAi = false }); return }
 
   val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
   val questions by dao.observeQuestions().collectAsStateWithLifecycle(emptyList())
@@ -64,12 +66,13 @@ fun QuestionBankScreen() {
       }
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(onClick = { practising = true }, enabled = readiness.ready > 0) { Text("Practice") }
+        Button(onClick = { generatingAi = true }) { Text("AI Generate") }
         Button(onClick = { importing = true }) { Text("Scan / PDF") }
         Button(onClick = { editing = null; showEditor = true }) { Icon(Icons.Default.Add, null); Text(" Add Question") }
       }
     }
     OutlinedTextField(query, { query = it }, label = { Text("Search questions, options or explanations") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-    if (questions.isEmpty()) Text("No questions yet. Add one manually or import printed MCQs from an image/PDF.")
+    if (questions.isEmpty()) Text("No questions yet. Add one manually, generate a reviewed AI draft, or import printed MCQs from an image/PDF.")
     else if (visibleQuestions.isEmpty()) Text("No questions match your search.")
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
       items(visibleQuestions, key = { it.id }) { question ->
@@ -136,6 +139,6 @@ private fun QuestionEditorDialog(existing: QuestionEntity?, topics: List<Knowled
         onSave(QuestionEntity(existing?.id ?: UUID.randomUUID().toString(), questionText.trim(), options.joinToString("\n") { it.trim() }, optionLetter(correctIndex), explanation.trim().ifBlank { null }, existing?.source ?: "USER", normalizeDifficulty(difficulty), existing?.createdAt ?: now, now), selectedTopic)
       }) { Text("Save") }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
   )
 }
