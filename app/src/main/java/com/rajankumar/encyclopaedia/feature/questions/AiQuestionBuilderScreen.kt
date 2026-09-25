@@ -75,6 +75,11 @@ fun AiQuestionBuilderScreen(
       color = MaterialTheme.colorScheme.onSurfaceVariant,
       style = MaterialTheme.typography.bodySmall,
     )
+    Text(
+      "Existing Question Bank stems are also supplied as a bounded avoid-list; duplicates are still blocked again during review and approval.",
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      style = MaterialTheme.typography.bodySmall,
+    )
     LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
       item {
         TextButton(onClick = { onTargetTopicChange(null) }) {

@@ -12,6 +12,7 @@ data class AiQuestionRequest(
   val count: Int = 10,
   val difficulty: AiQuestionDifficulty = AiQuestionDifficulty.MIXED,
   val referenceContext: String? = null,
+  val avoidQuestionTexts: List<String> = emptyList(),
 )
 
 data class AiQuestionDraft(

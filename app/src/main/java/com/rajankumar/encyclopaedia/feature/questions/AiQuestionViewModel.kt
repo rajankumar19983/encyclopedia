@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 class AiQuestionViewModel(
   private val generator: AiQuestionGenerator,
   private val referenceSource: AiQuestionReferenceSource = EmptyAiQuestionReferenceSource,
+  private val avoidanceSource: AiQuestionAvoidanceSource = EmptyAiQuestionAvoidanceSource,
 ) : ViewModel() {
   private val _uiState = MutableStateFlow(AiQuestionUiState())
   val uiState: StateFlow<AiQuestionUiState> = _uiState.asStateFlow()
@@ -74,7 +75,12 @@ class AiQuestionViewModel(
     viewModelScope.launch {
       val referenceContext = destinationTopicId
         ?.let { nodeId -> runCatching { referenceSource.load(nodeId) }.getOrNull() }
-      val groundedRequest = request.copy(referenceContext = referenceContext)
+      val avoidQuestionTexts = runCatching { avoidanceSource.load(destinationTopicId) }
+        .getOrDefault(emptyList())
+      val groundedRequest = request.copy(
+        referenceContext = referenceContext,
+        avoidQuestionTexts = avoidQuestionTexts,
+      )
 
       when (val result = generator.generate(groundedRequest)) {
         is AiQuestionGenerationResult.Success -> _uiState.update {

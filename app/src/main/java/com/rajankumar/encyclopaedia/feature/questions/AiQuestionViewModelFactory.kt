@@ -20,6 +20,7 @@ class AiQuestionViewModelFactory(context: Context) : ViewModelProvider.Factory {
     return AiQuestionViewModel(
       generator = AiQuestionGenerator(OpenAiProvider(keyStore)),
       referenceSource = RoomAiQuestionReferenceSource(dao),
+      avoidanceSource = RoomAiQuestionAvoidanceSource(dao),
     ) as T
   }
 }
