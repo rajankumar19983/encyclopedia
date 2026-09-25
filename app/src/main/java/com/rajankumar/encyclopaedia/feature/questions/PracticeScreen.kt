@@ -77,6 +77,7 @@ fun PracticeScreen(
     if (revisionIds.isNotEmpty()) {
       config = PracticeSessionConfig(PracticeMode.MISTAKES, revisionIds.size)
       questions = dao.loadRevisionPracticeQuestions(revisionIds)
+      startedAt = System.currentTimeMillis()
     }
   }
 
@@ -92,7 +93,10 @@ fun PracticeScreen(
         setupPreset = chosen.toQuestionBankFilterState()
         config = chosen
         questions = null
-        scope.launch { questions = dao.loadPracticeQuestions(chosen) }
+        scope.launch {
+          questions = dao.loadPracticeQuestions(chosen)
+          startedAt = System.currentTimeMillis()
+        }
       },
       onDone = onDone,
     )
@@ -125,66 +129,45 @@ fun PracticeScreen(
 
   if (index >= sessionQuestions.size) {
     PublishTeacherContext(null)
-    val summary = reviews.summary()
-    LazyColumn(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-      item { Text(summary.resultHeadline(), style = MaterialTheme.typography.headlineMedium) }
-      item { Text(summary.resultDetail(), style = MaterialTheme.typography.titleLarge) }
-      item { Text(practiceFeedback(summary.correct, summary.total), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-      val incorrect = reviews.incorrectOnly()
-      if (incorrect.isNotEmpty()) {
-        item { Text("Review mistakes", style = MaterialTheme.typography.titleLarge) }
-        incorrect.forEach { review ->
-          item(key = review.question.id) {
-            Card(Modifier.fillMaxWidth()) {
-              Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(review.question.questionText, style = MaterialTheme.typography.titleMedium)
-                Text("Your answer: ${review.question.answerLabel(review.selectedAnswer)}")
-                Text("Correct: ${review.question.answerLabel(review.question.correctAnswer)}", color = MaterialTheme.colorScheme.primary)
-                review.question.explanation?.takeIf(String::isNotBlank)?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-              }
-            }
-          }
+    PracticeSessionResultScreen(
+      reviews = reviews,
+      topics = topics,
+      questionTopics = questionTopics,
+      allowNewSession = revisionIds.isEmpty(),
+      onRetryMistakes = {
+        speech.stop()
+        val retryQuestions = reviews.questionsForRetry()
+        if (retryQuestions.isNotEmpty()) {
+          val retryConfig = (config ?: PracticeSessionConfig()).copy(
+            mode = PracticeMode.MISTAKES,
+            questionCount = retryQuestions.size,
+          )
+          config = retryConfig
+          questions = retryQuestions.shuffled().take(retryConfig.safeQuestionCount)
+          index = 0
+          selected = null
+          submitted = false
+          reviews = emptyList()
+          startedAt = System.currentTimeMillis()
+          sessionId = newPracticeSessionId()
         }
-      }
-      item {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-          Button(
-            onClick = {
-              speech.stop()
-              val incorrectIds = incorrect.map { it.question.id }.distinct()
-              val retryConfig = (config ?: PracticeSessionConfig()).copy(
-                mode = PracticeMode.MISTAKES,
-                questionCount = incorrectIds.size.coerceAtLeast(1),
-              )
-              config = retryConfig
-              questions = null
-              index = 0
-              selected = null
-              submitted = false
-              reviews = emptyList()
-              sessionId = newPracticeSessionId()
-              scope.launch {
-                questions = dao.loadRevisionPracticeQuestions(incorrectIds)
-                  .shuffled()
-                  .take(retryConfig.safeQuestionCount)
-              }
-            },
-            enabled = incorrect.isNotEmpty(),
-          ) { Text("Practise these mistakes") }
-          if (revisionIds.isEmpty()) {
-            Button(onClick = {
-              speech.stop()
-              config = null
-              questions = null
-              index = 0
-              reviews = emptyList()
-              sessionId = newPracticeSessionId()
-            }) { Text("New session") }
-          }
-        }
-      }
-      item { TextButton(onClick = { speech.stop(); onDone() }) { Text("Back to Question Bank") } }
-    }
+      },
+      onNewSession = {
+        speech.stop()
+        config = null
+        questions = null
+        index = 0
+        selected = null
+        submitted = false
+        reviews = emptyList()
+        startedAt = System.currentTimeMillis()
+        sessionId = newPracticeSessionId()
+      },
+      onDone = {
+        speech.stop()
+        onDone()
+      },
+    )
     return
   }
 
