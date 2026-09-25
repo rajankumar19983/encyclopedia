@@ -20,6 +20,7 @@ fun AiQuestionFlowScreen(onDone: () -> Unit) {
   val database = EncyclopaediaDatabase.get(context)
   val dao = database.dao()
   val topics by dao.observeAllNodes().collectAsStateWithLifecycle(emptyList())
+  val existingQuestions by dao.observeQuestions().collectAsStateWithLifecycle(emptyList())
   val scope = rememberCoroutineScope()
   val keyStore = remember(context) { LocalAiApiKeyStore(context) }
   val factory = remember(context) { AiQuestionViewModelFactory(context) }
@@ -33,6 +34,10 @@ fun AiQuestionFlowScreen(onDone: () -> Unit) {
   var saveError by remember { mutableStateOf<String?>(null) }
 
   val proposal = state.proposal
+  val approvalCheck = remember(proposal, existingQuestions) {
+    proposal?.let { checkAiQuestionApproval(it, existingQuestions) }
+  }
+
   if (proposal == null) {
     AiQuestionBuilderScreen(
       state = state,
@@ -54,6 +59,7 @@ fun AiQuestionFlowScreen(onDone: () -> Unit) {
     AiQuestionReviewScreen(
       proposal = proposal,
       destinationLabel = state.destinationLabel,
+      duplicateConflicts = approvalCheck?.duplicateConflicts.orEmpty(),
       isSaving = isSaving,
       isRegenerating = state.isGenerating,
       saveError = saveError,
@@ -63,7 +69,9 @@ fun AiQuestionFlowScreen(onDone: () -> Unit) {
         viewModel.updateProposal(it)
       },
       onApprove = {
-        if (!isSaving && !state.isGenerating) {
+        if (approvalCheck?.isApprovable != true) {
+          saveError = "Resolve validation and duplicate warnings before approval."
+        } else if (!isSaving && !state.isGenerating) {
           isSaving = true
           saveError = null
           scope.launch {

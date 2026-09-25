@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 fun AiQuestionReviewScreen(
   proposal: AiQuestionProposal,
   destinationLabel: String?,
+  duplicateConflicts: List<AiQuestionDuplicateConflict>,
   isSaving: Boolean,
   isRegenerating: Boolean,
   saveError: String?,
@@ -38,6 +39,7 @@ fun AiQuestionReviewScreen(
   onDiscard: () -> Unit,
 ) {
   val validation = remember(proposal) { AiQuestionValidator.validate(proposal) }
+  val duplicateIndices = remember(duplicateConflicts) { duplicateConflicts.map { it.proposalIndex }.toSet() }
   var editingIndex by remember { mutableStateOf<Int?>(null) }
   var confirmDiscard by remember { mutableStateOf(false) }
 
@@ -49,12 +51,15 @@ fun AiQuestionReviewScreen(
           "${proposal.questions.size} questions • ${destinationLabel ?: "No topic link"}",
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text("Nothing is saved until you approve this draft.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("AI generated • not marked as PYQ • nothing is saved until approval.", color = MaterialTheme.colorScheme.onSurfaceVariant)
       }
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         TextButton(onClick = { confirmDiscard = true }, enabled = !isSaving && !isRegenerating) { Text("Discard") }
         TextButton(onClick = onRegenerate, enabled = !isSaving && !isRegenerating) { Text(if (isRegenerating) "Regenerating…" else "Regenerate") }
-        Button(onClick = onApprove, enabled = validation.isValid && !isSaving && !isRegenerating) { Text(if (isSaving) "Saving…" else "Approve & save") }
+        Button(
+          onClick = onApprove,
+          enabled = validation.isValid && duplicateConflicts.isEmpty() && !isSaving && !isRegenerating,
+        ) { Text(if (isSaving) "Saving…" else "Approve & save") }
       }
     }
 
@@ -66,6 +71,25 @@ fun AiQuestionReviewScreen(
         }
       }
     }
+
+    if (duplicateConflicts.isNotEmpty()) {
+      Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+          Text(
+            "${duplicateConflicts.size} generated question${if (duplicateConflicts.size == 1) "" else "s"} already exist in your Question Bank.",
+            color = MaterialTheme.colorScheme.error,
+          )
+          Text("Edit or remove the highlighted questions before approval.", style = MaterialTheme.typography.bodySmall)
+          duplicateConflicts.take(6).forEach { conflict ->
+            Text(
+              "• #${conflict.proposalIndex + 1} matches: ${conflict.existingQuestionText}",
+              style = MaterialTheme.typography.bodySmall,
+            )
+          }
+        }
+      }
+    }
+
     generationError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     saveError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
@@ -82,6 +106,9 @@ fun AiQuestionReviewScreen(
                   enabled = proposal.questions.size > 1 && !isSaving && !isRegenerating,
                 ) { Text("Remove") }
               }
+            }
+            if (index in duplicateIndices) {
+              Text("Already in Question Bank", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
             }
             draft.options.forEachIndexed { optionIndex, option ->
               val marker = if (optionIndex == draft.correctIndex) "✓" else " "

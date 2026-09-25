@@ -16,7 +16,7 @@ object AiQuestionValidator {
     val seenQuestions = mutableSetOf<String>()
     proposal.questions.forEachIndexed { index, draft ->
       val number = index + 1
-      val fingerprint = draft.questionText.lowercase().replace(Regex("[^\\p{L}\\p{N}]+"), "")
+      val fingerprint = aiQuestionFingerprint(draft.questionText)
       if (draft.questionText.isBlank()) errors += "Question $number has empty question text."
       if (fingerprint.isNotBlank() && !seenQuestions.add(fingerprint)) errors += "Question $number duplicates another generated question."
       if (draft.options.size !in 4..6) errors += "Question $number must contain 4 to 6 options."

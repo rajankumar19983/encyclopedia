@@ -15,9 +15,16 @@ class AiQuestionApprovalService(
     require(validation.isValid) {
       "AI question proposal is invalid: ${validation.errors.joinToString()}"
     }
+
     val questions = AiQuestionEntityMapper.map(proposal)
     database.withTransaction {
-      questions.forEach { database.dao().saveQuestion(it, topicId) }
+      val dao = database.dao()
+      val duplicateConflicts = findAiQuestionDuplicateConflicts(proposal, dao.getAllQuestionsOnce())
+      require(duplicateConflicts.isEmpty()) {
+        val numbers = duplicateConflicts.joinToString { "#${it.proposalIndex + 1}" }
+        "AI questions $numbers already exist in the Question Bank. Edit or remove duplicates before approval."
+      }
+      questions.forEach { dao.saveQuestion(it, topicId) }
     }
     return questions
   }
