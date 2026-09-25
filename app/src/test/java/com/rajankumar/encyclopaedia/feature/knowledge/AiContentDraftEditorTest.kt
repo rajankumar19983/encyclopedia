@@ -2,6 +2,7 @@ package com.rajankumar.encyclopaedia.feature.knowledge
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class AiContentDraftEditorTest {
@@ -45,5 +46,76 @@ class AiContentDraftEditorTest {
     val edited = AiContentDraftEditor.removeLesson(node, 0)
 
     assertEquals(listOf("Two", "Three"), edited.lessons.map { it.title })
+  }
+
+  @Test
+  fun `nested node can be edited by path`() {
+    val root = AiKnowledgeDraft(
+      title = "Root",
+      children = listOf(
+        AiKnowledgeDraft(
+          title = "Module",
+          children = listOf(AiKnowledgeDraft(title = "Topic")),
+        ),
+      ),
+    )
+
+    val edited = AiContentDraftEditor.updateNodeAtPath(root, listOf(0, 0)) {
+      AiContentDraftEditor.rename(it, "Updated topic")
+    }
+
+    assertEquals("Updated topic", edited.children.single().children.single().title)
+    assertEquals("Root", edited.title)
+  }
+
+  @Test
+  fun `nested lesson can be edited and removed by path`() {
+    val root = AiKnowledgeDraft(
+      title = "Root",
+      children = listOf(
+        AiKnowledgeDraft(
+          title = "Topic",
+          lessons = listOf(
+            AiLessonDraft("First", "One"),
+            AiLessonDraft("Second", "Two"),
+          ),
+        ),
+      ),
+    )
+
+    val edited = AiContentDraftEditor.updateLessonAtPath(root, listOf(0), 1) {
+      it.copy(title = "Updated", content = "Updated content")
+    }
+    val removed = AiContentDraftEditor.removeLessonAtPath(edited, listOf(0), 0)
+
+    assertEquals(listOf("Updated"), removed.children.single().lessons.map { it.title })
+    assertEquals("Updated content", removed.children.single().lessons.single().content)
+  }
+
+  @Test
+  fun `nested child can be removed by path`() {
+    val root = AiKnowledgeDraft(
+      title = "Root",
+      children = listOf(
+        AiKnowledgeDraft(
+          title = "Module",
+          children = listOf(
+            AiKnowledgeDraft(title = "Keep"),
+            AiKnowledgeDraft(title = "Remove"),
+          ),
+        ),
+      ),
+    )
+
+    val edited = AiContentDraftEditor.removeNodeAtPath(root, listOf(0, 1))
+
+    assertEquals(listOf("Keep"), edited.children.single().children.map { it.title })
+  }
+
+  @Test
+  fun `root cannot be removed`() {
+    assertThrows(IllegalArgumentException::class.java) {
+      AiContentDraftEditor.removeNodeAtPath(AiKnowledgeDraft(title = "Root"), emptyList())
+    }
   }
 }

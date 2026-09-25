@@ -54,6 +54,10 @@ class AiGenerationViewModel(
     }
   }
 
+  fun updateProposal(proposal: AiContentProposal) {
+    _uiState.update { it.copy(proposal = proposal, errorMessage = null) }
+  }
+
   fun clearProposal() {
     _uiState.update { it.copy(proposal = null) }
   }
