@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -15,6 +16,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
@@ -29,7 +34,11 @@ fun AiContentReviewScreen(
   onDiscard: () -> Unit,
 ) {
   val validation = AiContentValidator.validate(proposal)
-  val rows = flattenReviewRows(proposal.root)
+  val stats = proposal.root.reviewStats()
+  val collapsibleKeys = proposal.root.collapsibleNodeKeys()
+  var collapsedKeys by remember(proposal.generatedAt) { mutableStateOf(emptySet<String>()) }
+  var confirmDiscard by remember { mutableStateOf(false) }
+  val rows = proposal.root.reviewRows(collapsedKeys)
 
   Column(
     modifier = Modifier.fillMaxSize().padding(28.dp),
@@ -46,9 +55,22 @@ fun AiContentReviewScreen(
           },
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Text(
+          "${stats.nodeCount} nodes • ${stats.lessonCount} lessons • ${stats.levelCount} levels",
+          style = MaterialTheme.typography.labelLarge,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
       }
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TextButton(onClick = onDiscard, enabled = !isSaving) { Text("Discard") }
+        TextButton(
+          onClick = { collapsedKeys = collapsibleKeys },
+          enabled = !isSaving && collapsibleKeys.isNotEmpty(),
+        ) { Text("Collapse all") }
+        TextButton(
+          onClick = { collapsedKeys = emptySet() },
+          enabled = !isSaving && collapsedKeys.isNotEmpty(),
+        ) { Text("Expand all") }
+        TextButton(onClick = { confirmDiscard = true }, enabled = !isSaving) { Text("Discard") }
         Button(
           onClick = onApprove,
           enabled = validation.isValid && !isSaving,
@@ -76,6 +98,15 @@ fun AiContentReviewScreen(
             row = row,
             proposal = proposal,
             enabled = !isSaving,
+            collapsed = row.collapseKey in collapsedKeys,
+            canCollapse = row.collapseKey in collapsibleKeys,
+            onToggleCollapsed = {
+              collapsedKeys = if (row.collapseKey in collapsedKeys) {
+                collapsedKeys - row.collapseKey
+              } else {
+                collapsedKeys + row.collapseKey
+              }
+            },
             onProposalChange = onProposalChange,
           )
           is AiReviewRow.Lesson -> LessonReviewCard(
@@ -88,6 +119,27 @@ fun AiContentReviewScreen(
       }
     }
   }
+
+  if (confirmDiscard) {
+    AlertDialog(
+      onDismissRequest = { confirmDiscard = false },
+      title = { Text("Discard AI draft?") },
+      text = {
+        Text("All edits to this draft will be lost. Nothing from this draft has been saved to your knowledge base yet.")
+      },
+      confirmButton = {
+        TextButton(
+          onClick = {
+            confirmDiscard = false
+            onDiscard()
+          },
+        ) { Text("Discard draft") }
+      },
+      dismissButton = {
+        TextButton(onClick = { confirmDiscard = false }) { Text("Keep reviewing") }
+      },
+    )
+  }
 }
 
 @Composable
@@ -95,6 +147,9 @@ private fun NodeReviewCard(
   row: AiReviewRow.Node,
   proposal: AiContentProposal,
   enabled: Boolean,
+  collapsed: Boolean,
+  canCollapse: Boolean,
+  onToggleCollapsed: () -> Unit,
   onProposalChange: (AiContentProposal) -> Unit,
 ) {
   Card(
@@ -103,10 +158,17 @@ private fun NodeReviewCard(
       .padding(start = (row.depth * 14).dp),
   ) {
     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-      Text(
-        if (row.path.isEmpty()) "Root knowledge node" else "Knowledge node • level ${row.depth + 1}",
-        style = MaterialTheme.typography.labelLarge,
-      )
+      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(
+          if (row.path.isEmpty()) "Root knowledge node" else "Knowledge node • level ${row.depth + 1}",
+          style = MaterialTheme.typography.labelLarge,
+        )
+        if (canCollapse) {
+          TextButton(onClick = onToggleCollapsed, enabled = enabled) {
+            Text(if (collapsed) "Expand contents" else "Collapse contents")
+          }
+        }
+      }
       OutlinedTextField(
         value = row.node.title,
         onValueChange = { title ->
@@ -204,38 +266,4 @@ private fun LessonReviewCard(
       ) { Text("Remove lesson") }
     }
   }
-}
-
-private sealed interface AiReviewRow {
-  val key: String
-
-  data class Node(
-    val path: List<Int>,
-    val depth: Int,
-    val node: AiKnowledgeDraft,
-  ) : AiReviewRow {
-    override val key: String = "node:${path.joinToString(".")}"
-  }
-
-  data class Lesson(
-    val nodePath: List<Int>,
-    val lessonIndex: Int,
-    val depth: Int,
-    val lesson: AiLessonDraft,
-  ) : AiReviewRow {
-    override val key: String = "lesson:${nodePath.joinToString(".")}:$lessonIndex"
-  }
-}
-
-private fun flattenReviewRows(root: AiKnowledgeDraft): List<AiReviewRow> = buildList {
-  fun visit(node: AiKnowledgeDraft, path: List<Int>, depth: Int) {
-    add(AiReviewRow.Node(path, depth, node))
-    node.lessons.forEachIndexed { index, lesson ->
-      add(AiReviewRow.Lesson(path, index, depth, lesson))
-    }
-    node.children.forEachIndexed { index, child ->
-      visit(child, path + index, depth + 1)
-    }
-  }
-  visit(root, emptyList(), 0)
 }
