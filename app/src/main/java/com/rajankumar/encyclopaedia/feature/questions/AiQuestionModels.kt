@@ -7,6 +7,11 @@ enum class AiQuestionDifficulty {
   HARD,
 }
 
+enum class AiQuestionDraftOrigin {
+  AI,
+  USER,
+}
+
 data class AiQuestionRequest(
   val topic: String,
   val count: Int = 10,
@@ -21,6 +26,7 @@ data class AiQuestionDraft(
   val correctIndex: Int,
   val explanation: String,
   val difficulty: String,
+  val origin: AiQuestionDraftOrigin = AiQuestionDraftOrigin.AI,
 )
 
 data class AiQuestionProposal(

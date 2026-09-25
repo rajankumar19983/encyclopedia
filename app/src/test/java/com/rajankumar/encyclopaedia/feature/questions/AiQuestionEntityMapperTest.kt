@@ -15,4 +15,22 @@ class AiQuestionEntityMapperTest {
     assertEquals("HARD", entity.difficulty)
     assertEquals("One\nTwo\nThree\nFour", entity.options)
   }
+
+  @Test fun preservesUserOriginForQuestionAddedDuringReview() {
+    val proposal = AiQuestionProposal(
+      listOf(
+        AiQuestionDraft(
+          questionText = "Manual question",
+          options = listOf("One", "Two", "Three", "Four"),
+          correctIndex = 0,
+          explanation = "Explanation",
+          difficulty = "MEDIUM",
+          origin = AiQuestionDraftOrigin.USER,
+        ),
+      ),
+    )
+
+    val entity = AiQuestionEntityMapper.map(proposal, now = 123L, idFactory = { "id-user" }).single()
+    assertEquals("USER", entity.source)
+  }
 }

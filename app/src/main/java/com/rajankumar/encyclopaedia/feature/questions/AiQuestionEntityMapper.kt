@@ -15,7 +15,7 @@ object AiQuestionEntityMapper {
       options = draft.options.joinToString("\n") { it.trim() },
       correctAnswer = optionLetter(draft.correctIndex),
       explanation = draft.explanation.trim(),
-      source = "AI",
+      source = draft.origin.name,
       difficulty = normalizeDifficulty(draft.difficulty),
       createdAt = now,
       updatedAt = now,

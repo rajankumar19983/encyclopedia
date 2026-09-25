@@ -17,6 +17,7 @@ class AiQuestionResponseParserTest {
     val proposal = (result as AiQuestionParseResult.Success).proposal
     assertEquals(1, proposal.questions.size)
     assertEquals(1, proposal.questions.single().correctIndex)
+    assertEquals(AiQuestionDraftOrigin.AI, proposal.questions.single().origin)
   }
 
   @Test fun acceptsJsonSurroundedByModelText() {

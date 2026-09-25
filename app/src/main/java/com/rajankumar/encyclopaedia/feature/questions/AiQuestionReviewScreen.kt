@@ -41,7 +41,9 @@ fun AiQuestionReviewScreen(
   val validation = remember(proposal) { AiQuestionValidator.validate(proposal) }
   val duplicateIndices = remember(duplicateConflicts) { duplicateConflicts.map { it.proposalIndex }.toSet() }
   var editingIndex by remember { mutableStateOf<Int?>(null) }
+  var addingQuestion by remember { mutableStateOf(false) }
   var confirmDiscard by remember { mutableStateOf(false) }
+  val isBusy = isSaving || isRegenerating
 
   Column(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -51,16 +53,32 @@ fun AiQuestionReviewScreen(
           "${proposal.questions.size} questions • ${destinationLabel ?: "No topic link"}",
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text("AI generated • not marked as PYQ • nothing is saved until approval.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+          "Generated items stay AI; questions you add here save as USER. Nothing is saved until approval.",
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text("Neither source is marked as PYQ by this flow.", color = MaterialTheme.colorScheme.onSurfaceVariant)
       }
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TextButton(onClick = { confirmDiscard = true }, enabled = !isSaving && !isRegenerating) { Text("Discard") }
-        TextButton(onClick = onRegenerate, enabled = !isSaving && !isRegenerating) { Text(if (isRegenerating) "Regenerating…" else "Regenerate") }
+        TextButton(
+          onClick = { addingQuestion = true },
+          enabled = proposal.questions.size < AI_QUESTION_PROPOSAL_MAX_SIZE && !isBusy,
+        ) { Text("Add MCQ") }
+        TextButton(onClick = { confirmDiscard = true }, enabled = !isBusy) { Text("Discard") }
+        TextButton(onClick = onRegenerate, enabled = !isBusy) { Text(if (isRegenerating) "Regenerating…" else "Regenerate") }
         Button(
           onClick = onApprove,
-          enabled = validation.isValid && duplicateConflicts.isEmpty() && !isSaving && !isRegenerating,
+          enabled = validation.isValid && duplicateConflicts.isEmpty() && !isBusy,
         ) { Text(if (isSaving) "Saving…" else "Approve & save") }
       }
+    }
+
+    if (proposal.questions.size >= AI_QUESTION_PROPOSAL_MAX_SIZE) {
+      Text(
+        "Draft limit reached: $AI_QUESTION_PROPOSAL_MAX_SIZE questions.",
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodySmall,
+      )
     }
 
     if (!validation.isValid) {
@@ -76,7 +94,7 @@ fun AiQuestionReviewScreen(
       Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
           Text(
-            "${duplicateConflicts.size} generated question${if (duplicateConflicts.size == 1) "" else "s"} already exist in your Question Bank.",
+            "${duplicateConflicts.size} draft question${if (duplicateConflicts.size == 1) "" else "s"} already exist in your Question Bank.",
             color = MaterialTheme.colorScheme.error,
           )
           Text("Edit or remove the highlighted questions before approval.", style = MaterialTheme.typography.bodySmall)
@@ -94,16 +112,16 @@ fun AiQuestionReviewScreen(
     saveError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-      itemsIndexed(proposal.questions, key = { index, draft -> "$index-${draft.questionText}" }) { index, draft ->
+      itemsIndexed(proposal.questions, key = { index, draft -> "$index-${draft.questionText}-${draft.origin}" }) { index, draft ->
         Card(Modifier.fillMaxWidth()) {
           Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
               Text("${index + 1}. ${draft.questionText}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
               Row {
-                TextButton(onClick = { editingIndex = index }, enabled = !isSaving && !isRegenerating) { Text("Edit") }
+                TextButton(onClick = { editingIndex = index }, enabled = !isBusy) { Text("Edit") }
                 TextButton(
                   onClick = { onProposalChange(removeAiQuestion(proposal, index)) },
-                  enabled = proposal.questions.size > 1 && !isSaving && !isRegenerating,
+                  enabled = proposal.questions.size > 1 && !isBusy,
                 ) { Text("Remove") }
               }
             }
@@ -114,7 +132,11 @@ fun AiQuestionReviewScreen(
               val marker = if (optionIndex == draft.correctIndex) "✓" else " "
               Text("$marker ${optionLetter(optionIndex)}. $option")
             }
-            Text("${draft.difficulty} • AI generated", style = MaterialTheme.typography.labelMedium)
+            val originLabel = when (draft.origin) {
+              AiQuestionDraftOrigin.AI -> "AI generated"
+              AiQuestionDraftOrigin.USER -> "Added manually"
+            }
+            Text("${draft.difficulty} • $originLabel", style = MaterialTheme.typography.labelMedium)
             Text("Explanation: ${draft.explanation}", color = MaterialTheme.colorScheme.onSurfaceVariant)
           }
         }
@@ -123,12 +145,32 @@ fun AiQuestionReviewScreen(
   }
 
   editingIndex?.let { index ->
+    if (index in proposal.questions.indices) {
+      AiQuestionEditDialog(
+        draft = proposal.questions[index],
+        title = "Edit MCQ",
+        confirmLabel = "Apply",
+        onDismiss = { editingIndex = null },
+        onSave = { updated ->
+          onProposalChange(updateAiQuestion(proposal, index) { updated })
+          editingIndex = null
+        },
+      )
+    } else {
+      editingIndex = null
+    }
+  }
+
+  if (addingQuestion) {
+    val manualDraft = remember { newManualAiQuestionDraft() }
     AiQuestionEditDialog(
-      draft = proposal.questions[index],
-      onDismiss = { editingIndex = null },
-      onSave = { updated ->
-        onProposalChange(updateAiQuestion(proposal, index) { updated })
-        editingIndex = null
+      draft = manualDraft,
+      title = "Add MCQ to draft",
+      confirmLabel = "Add question",
+      onDismiss = { addingQuestion = false },
+      onSave = { added ->
+        onProposalChange(appendAiQuestion(proposal, added.copy(origin = AiQuestionDraftOrigin.USER)))
+        addingQuestion = false
       },
     )
   }
@@ -136,8 +178,8 @@ fun AiQuestionReviewScreen(
   if (confirmDiscard) {
     AlertDialog(
       onDismissRequest = { confirmDiscard = false },
-      title = { Text("Discard generated questions?") },
-      text = { Text("All edits in this draft will be lost. Nothing has been saved yet.") },
+      title = { Text("Discard question draft?") },
+      text = { Text("All edits and manually added questions in this draft will be lost. Nothing has been saved yet.") },
       confirmButton = { TextButton(onClick = onDiscard) { Text("Discard") } },
       dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Keep reviewing") } },
     )
@@ -147,6 +189,8 @@ fun AiQuestionReviewScreen(
 @Composable
 private fun AiQuestionEditDialog(
   draft: AiQuestionDraft,
+  title: String,
+  confirmLabel: String,
   onDismiss: () -> Unit,
   onSave: (AiQuestionDraft) -> Unit,
 ) {
@@ -161,7 +205,7 @@ private fun AiQuestionEditDialog(
 
   AlertDialog(
     onDismissRequest = onDismiss,
-    title = { Text("Edit generated MCQ") },
+    title = { Text(title) },
     text = {
       LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item { OutlinedTextField(questionText, { questionText = it }, label = { Text("Question") }, modifier = Modifier.fillMaxWidth()) }
@@ -207,7 +251,7 @@ private fun AiQuestionEditDialog(
           )
         },
         enabled = valid,
-      ) { Text("Apply") }
+      ) { Text(confirmLabel) }
     },
     dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
   )
