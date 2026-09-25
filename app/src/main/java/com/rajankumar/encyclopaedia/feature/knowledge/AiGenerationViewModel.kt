@@ -68,6 +68,6 @@ class AiGenerationViewModel(
     AiProviderError.RateLimited -> "OpenAI rate limit reached. Try again shortly."
     is AiProviderError.Network -> message ?: "Network request failed."
     is AiProviderError.Http -> message ?: "OpenAI request failed with HTTP $statusCode."
-    is AiProviderError.InvalidResponse -> reason
+    is AiProviderError.InvalidResponse -> message ?: "OpenAI returned an invalid response."
   }
 }
