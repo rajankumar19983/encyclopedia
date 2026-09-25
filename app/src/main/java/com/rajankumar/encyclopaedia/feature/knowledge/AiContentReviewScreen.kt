@@ -28,9 +28,12 @@ fun AiContentReviewScreen(
   proposal: AiContentProposal,
   destinationLabel: String?,
   isSaving: Boolean,
+  isRegenerating: Boolean,
   saveError: String?,
+  generationError: String?,
   onProposalChange: (AiContentProposal) -> Unit,
   onApprove: () -> Unit,
+  onRegenerate: () -> Unit,
   onDiscard: () -> Unit,
 ) {
   val validation = AiContentValidator.validate(proposal)
@@ -38,7 +41,9 @@ fun AiContentReviewScreen(
   val collapsibleKeys = proposal.root.collapsibleNodeKeys()
   var collapsedKeys by remember(proposal.generatedAt) { mutableStateOf(emptySet<String>()) }
   var confirmDiscard by remember { mutableStateOf(false) }
+  var confirmRegenerate by remember { mutableStateOf(false) }
   val rows = proposal.root.reviewRows(collapsedKeys)
+  val isBusy = isSaving || isRegenerating
 
   Column(
     modifier = Modifier.fillMaxSize().padding(28.dp),
@@ -64,16 +69,20 @@ fun AiContentReviewScreen(
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         TextButton(
           onClick = { collapsedKeys = collapsibleKeys },
-          enabled = !isSaving && collapsibleKeys.isNotEmpty(),
+          enabled = !isBusy && collapsibleKeys.isNotEmpty(),
         ) { Text("Collapse all") }
         TextButton(
           onClick = { collapsedKeys = emptySet() },
-          enabled = !isSaving && collapsedKeys.isNotEmpty(),
+          enabled = !isBusy && collapsedKeys.isNotEmpty(),
         ) { Text("Expand all") }
-        TextButton(onClick = { confirmDiscard = true }, enabled = !isSaving) { Text("Discard") }
+        TextButton(
+          onClick = { confirmRegenerate = true },
+          enabled = !isBusy,
+        ) { Text(if (isRegenerating) "Regenerating…" else "Regenerate") }
+        TextButton(onClick = { confirmDiscard = true }, enabled = !isBusy) { Text("Discard") }
         Button(
           onClick = onApprove,
-          enabled = validation.isValid && !isSaving,
+          enabled = validation.isValid && !isBusy,
         ) { Text(if (isSaving) "Saving…" else "Approve & save") }
       }
     }
@@ -86,6 +95,9 @@ fun AiContentReviewScreen(
         }
       }
     }
+    generationError?.let {
+      Text("Regeneration failed: $it", color = MaterialTheme.colorScheme.error)
+    }
     saveError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
     LazyColumn(
@@ -97,7 +109,7 @@ fun AiContentReviewScreen(
           is AiReviewRow.Node -> NodeReviewCard(
             row = row,
             proposal = proposal,
-            enabled = !isSaving,
+            enabled = !isBusy,
             collapsed = row.collapseKey in collapsedKeys,
             canCollapse = row.collapseKey in collapsibleKeys,
             onToggleCollapsed = {
@@ -112,12 +124,35 @@ fun AiContentReviewScreen(
           is AiReviewRow.Lesson -> LessonReviewCard(
             row = row,
             proposal = proposal,
-            enabled = !isSaving,
+            enabled = !isBusy,
             onProposalChange = onProposalChange,
           )
         }
       }
     }
+  }
+
+  if (confirmRegenerate) {
+    AlertDialog(
+      onDismissRequest = { confirmRegenerate = false },
+      title = { Text("Generate a replacement draft?") },
+      text = {
+        Text(
+          "A successful regeneration will replace this draft and its edits. If generation fails, the current draft will remain available.",
+        )
+      },
+      confirmButton = {
+        TextButton(
+          onClick = {
+            confirmRegenerate = false
+            onRegenerate()
+          },
+        ) { Text("Regenerate draft") }
+      },
+      dismissButton = {
+        TextButton(onClick = { confirmRegenerate = false }) { Text("Keep current draft") }
+      },
+    )
   }
 
   if (confirmDiscard) {

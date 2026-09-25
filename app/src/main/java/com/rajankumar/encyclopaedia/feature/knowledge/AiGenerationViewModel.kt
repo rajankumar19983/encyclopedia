@@ -33,12 +33,7 @@ class AiGenerationViewModel(
     val state = _uiState.value
     if (!state.canGenerate) return
 
-    val request = AiContentRequest(
-      topic = state.topic.trim(),
-      parentNodeId = parentNodeId,
-      depth = state.depth,
-      includeLessons = state.includeLessons,
-    )
+    val request = state.toContentRequest(parentNodeId)
     val normalizedDestinationLabel = destinationLabel?.trim()?.takeIf(String::isNotEmpty)
 
     _uiState.update {
@@ -50,20 +45,15 @@ class AiGenerationViewModel(
         errorMessage = null,
       )
     }
-    viewModelScope.launch {
-      val prompt = AiContentPromptBuilder.build(request)
-      when (val result = generator.generate(prompt)) {
-        is AiContentGenerationResult.Success -> _uiState.update {
-          it.copy(isGenerating = false, proposal = result.proposal)
-        }
-        is AiContentGenerationResult.Failure -> _uiState.update {
-          it.copy(isGenerating = false, errorMessage = result.reason)
-        }
-        is AiContentGenerationResult.ProviderFailure -> _uiState.update {
-          it.copy(isGenerating = false, errorMessage = result.error.toUserMessage())
-        }
-      }
-    }
+    launchGeneration(request)
+  }
+
+  fun regenerate() {
+    val state = _uiState.value
+    if (state.isGenerating || state.proposal == null || state.topic.isBlank()) return
+
+    _uiState.update { it.copy(isGenerating = true, errorMessage = null) }
+    launchGeneration(state.toContentRequest(state.destinationNodeId))
   }
 
   fun updateProposal(proposal: AiContentProposal) {
@@ -76,12 +66,37 @@ class AiGenerationViewModel(
         proposal = null,
         destinationNodeId = null,
         destinationLabel = null,
+        errorMessage = null,
       )
     }
   }
 
   fun clearError() {
     _uiState.update { it.copy(errorMessage = null) }
+  }
+
+  private fun AiGenerationUiState.toContentRequest(parentNodeId: String?): AiContentRequest =
+    AiContentRequest(
+      topic = topic.trim(),
+      parentNodeId = parentNodeId,
+      depth = depth,
+      includeLessons = includeLessons,
+    )
+
+  private fun launchGeneration(request: AiContentRequest) {
+    viewModelScope.launch {
+      when (val result = generator.generate(request)) {
+        is AiContentGenerationResult.Success -> _uiState.update {
+          it.copy(isGenerating = false, proposal = result.proposal, errorMessage = null)
+        }
+        is AiContentGenerationResult.Failure -> _uiState.update {
+          it.copy(isGenerating = false, errorMessage = result.reason)
+        }
+        is AiContentGenerationResult.ProviderFailure -> _uiState.update {
+          it.copy(isGenerating = false, errorMessage = result.error.toUserMessage())
+        }
+      }
+    }
   }
 
   private fun AiProviderError.toUserMessage(): String = when (this) {

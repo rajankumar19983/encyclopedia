@@ -2,6 +2,7 @@ package com.rajankumar.encyclopaedia.feature.knowledge
 
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -15,6 +16,31 @@ class AiContentGeneratorTest {
     val result = AiContentGenerator(provider).generate("Create a Networks topic")
     assertTrue(result is AiContentGenerationResult.Success)
     assertEquals("Networks", (result as AiContentGenerationResult.Success).proposal.root.title)
+  }
+
+  @Test
+  fun requestGenerationUsesStructuredResponseContract() = runBlocking {
+    var capturedRequest: AiGenerationRequest? = null
+    val provider = AiProvider { request ->
+      capturedRequest = request
+      AiGenerationResult.Success("{\"root\":{\"title\":\"Operating Systems\",\"lessons\":[],\"children\":[]}}")
+    }
+
+    val result = AiContentGenerator(provider).generate(
+      AiContentRequest(
+        topic = "Operating Systems",
+        depth = AiContentDepth.DEEP,
+        includeLessons = true,
+      ),
+    )
+
+    assertTrue(result is AiContentGenerationResult.Success)
+    val prompt = capturedRequest?.prompt.orEmpty()
+    assertTrue(prompt.contains("Return only one JSON object"))
+    assertTrue(prompt.contains("\"root\""))
+    assertTrue(prompt.contains("children recursively"))
+    assertTrue(prompt.contains("advanced and easily confused concepts"))
+    assertTrue(prompt.contains("include concise but complete permanent lesson content"))
   }
 
   @Test
@@ -33,6 +59,6 @@ class AiContentGeneratorTest {
     }
     val result = AiContentGenerator(provider).generate("   ")
     assertTrue(result is AiContentGenerationResult.Failure)
-    assertEquals(false, called)
+    assertFalse(called)
   }
 }

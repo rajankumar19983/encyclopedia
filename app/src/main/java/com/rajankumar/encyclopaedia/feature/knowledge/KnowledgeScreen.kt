@@ -69,13 +69,15 @@ fun KnowledgeScreen() {
       proposal = proposal,
       destinationLabel = aiState.destinationLabel,
       isSaving = isApprovingAi,
+      isRegenerating = aiState.isGenerating,
       saveError = approvalError,
+      generationError = aiState.errorMessage,
       onProposalChange = { updatedProposal ->
         approvalError = null
         aiViewModel.updateProposal(updatedProposal)
       },
       onApprove = {
-        if (!isApprovingAi) {
+        if (!isApprovingAi && !aiState.isGenerating) {
           isApprovingAi = true
           approvalError = null
           val destinationNodeId = aiState.destinationNodeId
@@ -92,6 +94,10 @@ fun KnowledgeScreen() {
             }
           }
         }
+      },
+      onRegenerate = {
+        approvalError = null
+        aiViewModel.regenerate()
       },
       onDiscard = {
         aiViewModel.clearProposal()

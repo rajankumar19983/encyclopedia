@@ -4,6 +4,9 @@ class AiContentGenerator(
   private val provider: AiProvider,
   private val model: String = "gpt-5.6-luna",
 ) {
+  suspend fun generate(request: AiContentRequest): AiContentGenerationResult =
+    generate(AiContentResponseContract.promptFor(request))
+
   suspend fun generate(prompt: String): AiContentGenerationResult {
     if (prompt.isBlank()) return AiContentGenerationResult.Failure("Prompt cannot be blank")
     return when (val result = provider.generate(AiGenerationRequest(prompt.trim(), model))) {
