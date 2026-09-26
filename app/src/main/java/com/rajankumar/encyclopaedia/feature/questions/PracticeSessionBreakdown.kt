@@ -9,6 +9,7 @@ data class PracticeBreakdownRow(
   val total: Int,
   val correct: Int,
   val totalTimeMs: Long,
+  val referenceId: String? = null,
 ) {
   val mistakes: Int
     get() = (total - correct).coerceAtLeast(0)
@@ -45,53 +46,82 @@ data class PracticeSessionBreakdown(
   val focusInsight: PracticeFocusInsight?,
 )
 
+private data class BreakdownClassification(
+  val key: String,
+  val label: String,
+  val referenceId: String? = null,
+)
+
 fun buildPracticeSessionBreakdown(
   reviews: List<PracticeAnswerReview>,
   topics: List<KnowledgeNodeEntity> = emptyList(),
   questionTopics: List<QuestionTopicEntity> = emptyList(),
 ): PracticeSessionBreakdown {
-  val topicNamesById = topics.associate { it.id to it.name }
-  val topicLabelByQuestionId = questionTopics
+  val topicNamesById = topics.associate { it.id to it.name.trim() }
+  val topicClassificationByQuestionId = questionTopics
     .groupBy { it.questionId }
     .mapValues { (_, links) ->
-      links.asSequence()
-        .mapNotNull { topicNamesById[it.knowledgeNodeId] }
-        .map(String::trim)
-        .filter(String::isNotBlank)
+      val linkedTopics = links.asSequence()
+        .map { it.knowledgeNodeId }
         .distinct()
-        .sortedBy { it.lowercase() }
+        .mapNotNull { topicId ->
+          topicNamesById[topicId]
+            ?.takeIf(String::isNotBlank)
+            ?.let { name -> topicId to name }
+        }
+        .sortedBy { (topicId, _) -> topicId }
         .toList()
-        .takeIf { it.isNotEmpty() }
-        ?.joinToString(" + ")
-        ?: "Unlinked"
+
+      when (linkedTopics.size) {
+        0 -> BreakdownClassification("topic:unlinked", "Unlinked")
+        1 -> {
+          val (topicId, name) = linkedTopics.single()
+          BreakdownClassification("topic:$topicId", name, topicId)
+        }
+        else -> BreakdownClassification(
+          key = "topics:${linkedTopics.joinToString(",") { it.first }}",
+          label = linkedTopics.map { it.second }.distinct().joinToString(" + "),
+        )
+      }
     }
 
   val byDifficulty = reviews.toBreakdownRows { review ->
     val key = normalizeDifficulty(review.question.difficulty)
-    key to key.lowercase().replaceFirstChar(Char::uppercase)
+    BreakdownClassification(key, key.lowercase().replaceFirstChar(Char::uppercase))
   }
   val bySource = reviews.toBreakdownRows { review ->
     val key = review.question.source.trim().uppercase().ifBlank { "UNKNOWN" }
-    key to displayQuestionSource(review.question.source)
+    BreakdownClassification(key, displayQuestionSource(review.question.source))
   }
   val byTopic = reviews.toBreakdownRows { review ->
-    val label = topicLabelByQuestionId[review.question.id] ?: "Unlinked"
-    label.lowercase() to label
+    topicClassificationByQuestionId[review.question.id]
+      ?: BreakdownClassification("topic:unlinked", "Unlinked")
   }
 
   val topicFocus = byTopic
     .asSequence()
-    .filter { it.label != "Unlinked" && it.total >= 2 && it.accuracyPercent < 80 }
-    .minWithOrNull(compareBy<PracticeBreakdownRow> { it.accuracyPercent }.thenByDescending { it.total }.thenBy { it.label.lowercase() })
+    .filter { it.referenceId != null && it.total >= 2 && it.accuracyPercent < 80 }
+    .minWithOrNull(
+      compareBy<PracticeBreakdownRow> { it.accuracyPercent }
+        .thenByDescending { it.total }
+        .thenBy { it.label.lowercase() },
+    )
     ?.let { PracticeFocusInsight(PracticeFocusDimension.TOPIC, it) }
   val difficultyFocus = byDifficulty
     .asSequence()
     .filter { it.total >= 2 && it.accuracyPercent < 80 }
-    .minWithOrNull(compareBy<PracticeBreakdownRow> { it.accuracyPercent }.thenByDescending { it.total }.thenBy { it.label.lowercase() })
+    .minWithOrNull(
+      compareBy<PracticeBreakdownRow> { it.accuracyPercent }
+        .thenByDescending { it.total }
+        .thenBy { it.label.lowercase() },
+    )
     ?.let { PracticeFocusInsight(PracticeFocusDimension.DIFFICULTY, it) }
 
   val slowest = reviews
-    .sortedWith(compareByDescending<PracticeAnswerReview> { it.timeTakenMs.coerceAtLeast(0) }.thenBy { it.question.id })
+    .sortedWith(
+      compareByDescending<PracticeAnswerReview> { it.timeTakenMs.coerceAtLeast(0) }
+        .thenBy { it.question.id },
+    )
     .take(3)
     .map { review ->
       PracticeSlowQuestion(
@@ -112,15 +142,15 @@ fun buildPracticeSessionBreakdown(
 }
 
 private fun List<PracticeAnswerReview>.toBreakdownRows(
-  classifier: (PracticeAnswerReview) -> Pair<String, String>,
+  classifier: (PracticeAnswerReview) -> BreakdownClassification,
 ): List<PracticeBreakdownRow> = groupBy(classifier).map { (classification, groupedReviews) ->
-  val (key, label) = classification
   PracticeBreakdownRow(
-    key = key,
-    label = label,
+    key = classification.key,
+    label = classification.label,
     total = groupedReviews.size,
     correct = groupedReviews.count { it.wasCorrect },
     totalTimeMs = groupedReviews.sumOf { it.timeTakenMs.coerceAtLeast(0) },
+    referenceId = classification.referenceId,
   )
 }.sortedWith(
   compareBy<PracticeBreakdownRow> { it.accuracyPercent }

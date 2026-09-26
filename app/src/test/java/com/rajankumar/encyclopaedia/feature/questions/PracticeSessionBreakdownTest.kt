@@ -38,15 +38,17 @@ class PracticeSessionBreakdownTest {
     val cpu = result.byTopic.single { it.label == "CPU" }
     assertEquals(2, cpu.total)
     assertEquals(1, cpu.mistakes)
+    assertEquals("cpu", cpu.referenceId)
     assertEquals("Unlinked", result.byTopic.first().label)
 
     assertEquals(listOf("q4", "q2", "q3"), result.slowestQuestions.map { it.questionId })
     assertEquals(PracticeFocusDimension.TOPIC, result.focusInsight?.dimension)
     assertEquals("CPU", result.focusInsight?.row?.label)
+    assertEquals("cpu", result.focusInsight?.row?.referenceId)
   }
 
   @Test
-  fun combinesMultipleTopicLinksWithoutDoubleCountingAnswer() {
+  fun combinesMultipleTopicLinksWithoutDoubleCountingOrAmbiguousAction() {
     val reviews = listOf(review(question("q1", "Question", "USER", "MEDIUM"), true, 5_000))
     val topics = listOf(topic("cpu", "CPU"), topic("registers", "Registers"))
     val links = listOf(
@@ -59,7 +61,51 @@ class PracticeSessionBreakdownTest {
     assertEquals(1, result.byTopic.size)
     assertEquals("CPU + Registers", result.byTopic.single().label)
     assertEquals(1, result.byTopic.single().total)
+    assertNull(result.byTopic.single().referenceId)
     assertNull(result.focusInsight)
+  }
+
+  @Test
+  fun duplicateTopicNamesStayDistinctByStableId() {
+    val reviews = listOf(
+      review(question("q1", "First CPU", "USER", "MEDIUM"), false, 5_000),
+      review(question("q2", "Second CPU", "USER", "MEDIUM"), false, 6_000),
+      review(question("q3", "First CPU again", "USER", "MEDIUM"), true, 4_000),
+    )
+    val topics = listOf(topic("cpu-a", "CPU"), topic("cpu-b", "CPU"))
+    val links = listOf(
+      QuestionTopicEntity("q1", "cpu-a"),
+      QuestionTopicEntity("q3", "cpu-a"),
+      QuestionTopicEntity("q2", "cpu-b"),
+    )
+
+    val result = buildPracticeSessionBreakdown(reviews, topics, links)
+
+    val cpuRows = result.byTopic.filter { it.label == "CPU" }
+    assertEquals(2, cpuRows.size)
+    assertEquals(setOf("cpu-a", "cpu-b"), cpuRows.mapNotNull { it.referenceId }.toSet())
+    assertEquals("cpu-a", result.focusInsight?.row?.referenceId)
+  }
+
+  @Test
+  fun multiLinkedWeakRowsFallBackToDifficultyFocus() {
+    val reviews = listOf(
+      review(question("q1", "One", "USER", "HARD"), false, 5_000),
+      review(question("q2", "Two", "USER", "HARD"), false, 6_000),
+    )
+    val topics = listOf(topic("cpu", "CPU"), topic("registers", "Registers"))
+    val links = listOf(
+      QuestionTopicEntity("q1", "cpu"),
+      QuestionTopicEntity("q1", "registers"),
+      QuestionTopicEntity("q2", "cpu"),
+      QuestionTopicEntity("q2", "registers"),
+    )
+
+    val result = buildPracticeSessionBreakdown(reviews, topics, links)
+
+    assertNull(result.byTopic.single().referenceId)
+    assertEquals(PracticeFocusDimension.DIFFICULTY, result.focusInsight?.dimension)
+    assertEquals("Hard", result.focusInsight?.row?.label)
   }
 
   @Test

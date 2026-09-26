@@ -53,6 +53,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun PracticeScreen(
   onDone: () -> Unit,
+  onOpenRevision: () -> Unit = {},
   initialFilters: QuestionBankFilterState = QuestionBankFilterState(),
 ) {
   val dao = EncyclopaediaDatabase.get(LocalContext.current).dao()
@@ -72,6 +73,18 @@ fun PracticeScreen(
   var submitted by remember { mutableStateOf(false) }
   var startedAt by remember { mutableLongStateOf(System.currentTimeMillis()) }
   var reviews by remember { mutableStateOf<List<PracticeAnswerReview>>(emptyList()) }
+
+  fun startSession(nextConfig: PracticeSessionConfig, nextQuestions: List<QuestionEntity>) {
+    setupPreset = nextConfig.toQuestionBankFilterState()
+    config = nextConfig
+    questions = nextQuestions.shuffled().take(nextConfig.safeQuestionCount)
+    index = 0
+    selected = null
+    submitted = false
+    reviews = emptyList()
+    startedAt = System.currentTimeMillis()
+    sessionId = newPracticeSessionId()
+  }
 
   LaunchedEffect(revisionIds) {
     if (revisionIds.isNotEmpty()) {
@@ -142,15 +155,26 @@ fun PracticeScreen(
             mode = PracticeMode.MISTAKES,
             questionCount = retryQuestions.size,
           )
-          config = retryConfig
-          questions = retryQuestions.shuffled().take(retryConfig.safeQuestionCount)
-          index = 0
-          selected = null
-          submitted = false
-          reviews = emptyList()
-          startedAt = System.currentTimeMillis()
-          sessionId = newPracticeSessionId()
+          startSession(retryConfig, retryQuestions)
         }
+      },
+      onPracticeFocusTopic = { topicId ->
+        speech.stop()
+        val focusConfig = PracticeSessionConfig(
+          mode = PracticeMode.RANDOM,
+          questionCount = PracticeConfig.defaultSessionSize,
+          topicId = topicId,
+        )
+        val focusQuestions = filterPracticeCandidates(
+          candidates = allQuestions,
+          questionTopics = questionTopics,
+          config = focusConfig,
+        )
+        if (focusQuestions.isNotEmpty()) startSession(focusConfig, focusQuestions)
+      },
+      onOpenRevision = {
+        speech.stop()
+        onOpenRevision()
       },
       onNewSession = {
         speech.stop()

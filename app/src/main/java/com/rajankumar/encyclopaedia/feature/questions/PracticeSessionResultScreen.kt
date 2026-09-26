@@ -26,6 +26,8 @@ fun PracticeSessionResultScreen(
   questionTopics: List<QuestionTopicEntity>,
   allowNewSession: Boolean,
   onRetryMistakes: () -> Unit,
+  onPracticeFocusTopic: (String) -> Unit,
+  onOpenRevision: () -> Unit,
   onNewSession: () -> Unit,
   onDone: () -> Unit,
 ) {
@@ -69,13 +71,20 @@ fun PracticeSessionResultScreen(
     breakdown.focusInsight?.let { insight ->
       item {
         Card(Modifier.fillMaxWidth()) {
-          Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+          Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Focus next", style = MaterialTheme.typography.titleMedium)
             Text("${insight.dimension.label}: ${insight.row.label}")
             Text(
               "${insight.row.accuracyPercent}% accuracy • ${insight.row.mistakes} mistake${if (insight.row.mistakes == 1) "" else "s"} in ${insight.row.total} questions",
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (insight.dimension == PracticeFocusDimension.TOPIC) {
+              insight.row.referenceId?.let { topicId ->
+                Button(onClick = { onPracticeFocusTopic(topicId) }) {
+                  Text("Practise weak topic")
+                }
+              }
+            }
           }
         }
       }
@@ -128,12 +137,17 @@ fun PracticeSessionResultScreen(
     }
 
     item {
-      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Button(onClick = onRetryMistakes, enabled = incorrect.isNotEmpty()) {
-          Text("Practise these mistakes")
+      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+          Button(onClick = onRetryMistakes, enabled = incorrect.isNotEmpty()) {
+            Text("Practise these mistakes")
+          }
+          if (allowNewSession) {
+            Button(onClick = onNewSession) { Text("New session") }
+          }
         }
-        if (allowNewSession) {
-          Button(onClick = onNewSession) { Text("New session") }
+        if (incorrect.isNotEmpty()) {
+          TextButton(onClick = onOpenRevision) { Text("Open Revision") }
         }
       }
     }
